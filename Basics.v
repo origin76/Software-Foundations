@@ -730,17 +730,23 @@ Proof. simpl. reflexivity.  Qed.
     请利用前文定义的函数写出该定义，不要使用 [Fixpoint] 构造新的递归。
     （只需前文中的一个函数即可实现该定义，不过也可两者皆用。） *)
 
-Definition ltb (n m : nat) : bool
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition ltb (n m : nat) : bool :=
+  match (n =? m , n <=? m) with
+   | (true , true) => false
+   | (false , true) => true
+   | (_ , _) => false
+  end.
+
+  
 
 Notation "x <? y" := (ltb x y) (at level 70) : nat_scope.
 
 Example test_ltb1:             (ltb 2 2) = false.
-(* 请在此处解答 *) Admitted.
+Proof. simpl. reflexivity.  Qed.
 Example test_ltb2:             (ltb 2 4) = true.
-(* 请在此处解答 *) Admitted.
+Proof. simpl. reflexivity.  Qed.
 Example test_ltb3:             (ltb 4 2) = false.
-(* 请在此处解答 *) Admitted.
+Proof. simpl. reflexivity.  Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -845,7 +851,7 @@ Proof.
   (* 将前提移到上下文中： *)
   intros H.
   (* 用前提改写目标： *)
-  rewrite -> H.
+  rewrite <- H.
   reflexivity.  Qed.
 
 (** 证明的第一行将全称量词变量 [n] 和 [m] 移到上下文中。第二行将前提
@@ -863,7 +869,11 @@ Proof.
 Theorem plus_id_exercise : forall n m o : nat,
   n = m -> m = o -> n + m = m + o.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m o.
+  intros H I.
+  rewrite H.
+  rewrite I.
+reflexivity. Qed.
 (** [] *)
 
 (** [Admitted] 指令告诉 Coq 我们想要跳过此定理的证明，而将其作为已知条件，
@@ -898,7 +908,13 @@ Proof.
 Theorem mult_n_1 : forall n : nat,
   n * 1 = n.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n.
+  rewrite <- (mult_n_Sm n 0).  
+  rewrite <- mult_n_O.
+  simpl.                   
+  reflexivity.
+Qed.
+
 
 (** [] *)
 
@@ -1080,14 +1096,23 @@ Qed.
 Theorem andb_true_elim2 : forall b c : bool,
   andb b c = true -> c = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
-(** [] *)
+  intros b c H.  
+  destruct b eqn:Eb.  
+
+  - destruct c eqn:Ec.
+    + reflexivity.
+    + inversion H.  
+  - inversion H.  
+Qed.
+
 
 (** **** 练习：1 星, standard (zero_nbeq_plus_1)  *)
 Theorem zero_nbeq_plus_1 : forall n : nat,
   0 =? (n + 1) = false.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros [|n].
+  - reflexivity.
+  - reflexivity.  Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -1152,9 +1177,29 @@ Fixpoint plus' (n : nat) (m : nat) : nat :=
     定义。但这个定义需要违背上述的限制，以此来让 Coq 拒绝。（如果您决定将这个可选
     练习作为作业，请确保您将您的解答注释掉以防止 Coq 拒绝执行整个文件。） *)
 
-(* 请在此处解答
+Fixpoint div (n m : nat) : nat :=
+  match n with
+  | O => O
+  | S n' => 
+      if n' <? m then O (* 如果 n' < m，则商为 0 *)
+      else S (div (n' - m) m) (* 否则递归 *)
+  end.
 
-    [] *)
+
+(*
+Fixpoint collatz (n : nat) : nat :=
+  match n with
+  | O => 0
+  | 1 => 1
+  | S (S n') =>
+    if evenb n then collatz (div n 2)
+    else collatz (3 * n + 1)
+  end.
+*)
+
+
+
+
 
 (* ################################################################# *)
 (** * 更多练习 *)
@@ -1173,7 +1218,12 @@ Theorem identity_fn_applied_twice :
   (forall (x : bool), f x = x) ->
   forall (b : bool), f (f b) = b.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros f H b.
+  rewrite H.
+  rewrite H.
+  reflexivity.  
+Qed.
+
 
 (** [] *)
 
@@ -1182,7 +1232,17 @@ Proof.
     现在声明并证明定理 [negation_fn_applied_twice]，与上一个类似，
     但是第二个前提说明函数 [f] 有 [f x = negb x] 的性质。 *)
 
-(* 请在此处解答 *)
+Theorem negation_fn_applied_twice :
+  forall (f: bool -> bool),
+  (forall (x:bool), f x = negb x) ->
+  forall (b:bool) , f (f b) = b.
+Proof.
+  intros f H b.
+  rewrite H.
+  rewrite H.
+  rewrite negb_involutive.
+  reflexivity.  
+Qed.
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_negation_fn_applied_twice : option (nat*string) := None.
@@ -1200,7 +1260,15 @@ Theorem andb_eq_orb :
   (andb b c = orb b c) ->
   b = c.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros b c H.
+  destruct b.
+  - destruct c.
+    + reflexivity.
+    + discriminate H.
+  - destruct c.
+    + discriminate H.
+    + reflexivity.
+Qed.
 
 (** [] *)
 
@@ -1237,36 +1305,51 @@ Inductive bin : Type :=
 (** 补全下面二进制自增函数 [incr] 的定义。并且补全二进制数与一进制自然数转换的
     函数 [bin_to_nat]。 *)
 
-Fixpoint incr (m:bin) : bin
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint incr (m:bin) : bin :=
+  match m with 
+  | Z => B Z 
+  | A n => B n
+  | B n => A (incr n)
+  end.
 
-Fixpoint bin_to_nat (m:bin) : nat
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint bin_to_nat (m:bin) : nat := 
+  match m with 
+  | Z => 0
+  | A n => plus (bin_to_nat n) (bin_to_nat n)
+  | B n => S (plus (bin_to_nat n) (bin_to_nat n))
+  end.
 
 (** 下面这些针对单增函数和二进制转换函数的“单元测试”可以验算你的定义的正确性。
     当然，这些单元测试并不能确保你的定义在所有输入下都是正确的！我们在下一章的
     末尾会重新回到这个话题。 *)
 
 Example test_bin_incr1 : (incr (B Z)) = A (B Z).
-(* 请在此处解答 *) Admitted.
+Proof. 
+reflexivity. Qed.
 
 Example test_bin_incr2 : (incr (A (B Z))) = B (B Z).
-(* 请在此处解答 *) Admitted.
+Proof.
+reflexivity. Qed.
 
 Example test_bin_incr3 : (incr (B (B Z))) = A (A (B Z)).
-(* 请在此处解答 *) Admitted.
+Proof.
+reflexivity. Qed.
 
 Example test_bin_incr4 : bin_to_nat (A (B Z)) = 2.
-(* 请在此处解答 *) Admitted.
+Proof.
+reflexivity. Qed.
 
 Example test_bin_incr5 :
         bin_to_nat (incr (B Z)) = 1 + bin_to_nat (B Z).
-(* 请在此处解答 *) Admitted.
+Proof.
+reflexivity. Qed.
 
 Example test_bin_incr6 :
         bin_to_nat (incr (incr (B Z))) = 2 + bin_to_nat (B Z).
-(* 请在此处解答 *) Admitted.
+Proof.
+reflexivity. Qed.
 
 (** [] *)
 
 (* 2022-03-14 05:26:55 (UTC+00) *)
+(* finish by zerick 2025-10-13 23:15:00 (UTC+8) *)
