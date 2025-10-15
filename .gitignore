@@ -1,2 +1,8 @@
 *.html
 common/
+*.aux
+*.glob
+*.vo
+*.vok
+*.vos
+*Makefile*
