@@ -126,14 +126,22 @@ Proof.
 Theorem snd_fst_is_swap : forall (p : natprod),
   (snd p, fst p) = swap_pair p.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros p.
+  destruct p as [n m].
+  simpl.
+  reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：1 星, standard, optional (fst_swap_is_snd)  *)
 Theorem fst_swap_is_snd : forall (p : natprod),
   fst (swap_pair p) = snd p.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros p.
+  destruct p as [n m].
+  simpl.
+  reflexivity.
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -266,34 +274,47 @@ Proof. reflexivity.  Qed.
     完成以下 [nonzeros]、[oddmembers] 和 [countoddmembers] 的定义，
     你可以查看测试函数来理解这些函数应该做什么。 *)
 
-Fixpoint nonzeros (l:natlist) : natlist
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint nonzeros (l:natlist) : natlist := 
+  match l with
+  | nil => nil
+  | h :: t => match h with 
+              | 0 => nonzeros t
+              | _ => h :: nonzeros t
+              end
+  end.
+
+  
 
 Example test_nonzeros:
   nonzeros [0;1;0;2;3;0;0] = [1;2;3].
-  (* 请在此处解答 *) Admitted.
+Proof. simpl. reflexivity. Qed.
 
-Fixpoint oddmembers (l:natlist) : natlist
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint oddmembers (l:natlist) : natlist :=
+  match l with 
+  | nil => nil
+  | h :: t => if oddb h then h :: oddmembers t
+              else oddmembers t
+  end.
+  
 
 Example test_oddmembers:
   oddmembers [0;1;0;2;3;0;0] = [1;3].
-  (* 请在此处解答 *) Admitted.
+Proof. simpl. reflexivity. Qed.
 
-Definition countoddmembers (l:natlist) : nat
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition countoddmembers (l:natlist) : nat := 
+  length (oddmembers l).
 
 Example test_countoddmembers1:
   countoddmembers [1;0;3;1;4;5] = 4.
-  (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_countoddmembers2:
   countoddmembers [0;2;4] = 0.
-  (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_countoddmembers3:
   countoddmembers nil = 0.
-  (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 (** [] *)
 
 (** **** 练习：3 星, advanced (alternate) 
@@ -306,24 +327,28 @@ Example test_countoddmembers3:
     可以试着换一种稍微啰嗦一点的解法，比如同时对两个列表中的元素进行操作。
     有种可行的解法需要定义新的序对，但这并不是唯一的方法。） *)
 
-Fixpoint alternate (l1 l2 : natlist) : natlist
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint alternate (l1 l2 : natlist) : natlist :=
+  match l1, l2 with
+  | nil, _ => l2
+  | _, nil => l1
+  | h1 :: t1, h2 :: t2 => h1 :: h2 :: alternate t1 t2
+  end.
 
 Example test_alternate1:
   alternate [1;2;3] [4;5;6] = [1;4;2;5;3;6].
-  (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_alternate2:
   alternate [1] [4;5;6] = [1;4;5;6].
-  (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_alternate3:
   alternate [1;2;3] [4] = [1;4;2;3].
-  (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_alternate4:
   alternate [] [20;30] = [20;30].
-  (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 (** [] *)
 
 (* ================================================================= *)
@@ -338,15 +363,19 @@ Definition bag := natlist.
 
     为袋子完成以下 [count]、[sum]、[add]、和 [member] 函数的定义。 *)
 
-Fixpoint count (v:nat) (s:bag) : nat
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint count (v:nat) (s:bag) : nat :=
+  match s with
+  | nil => 0
+  | h :: t => if eqb h v then S (count v t)
+              else count v t
+  end.
 
 (** 这些命题都能通过 [reflexivity] 来证明。 *)
 
 Example test_count1:              count 1 [1;2;3;1;4;1] = 3.
- (* 请在此处解答 *) Admitted.
+Proof.  reflexivity. Qed.
 Example test_count2:              count 6 [1;2;3;1;4;1] = 0.
- (* 请在此处解答 *) Admitted.
+Proof.  reflexivity. Qed.
 
 (** Multiset [sum] is similar to set [union]: [sum a b] contains all
     the elements of [a] and of [b].  (Mathematicians usually define
@@ -360,28 +389,29 @@ Example test_count2:              count 6 [1;2;3;1;4;1] = 0.
     whether [sum] can be implemented in another way -- perhaps by
     using one or more functions that have already been defined.  *)
 
-Definition sum : bag -> bag -> bag
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition sum : bag -> bag -> bag :=
+  fun l1 l2 => l1 ++ l2.
 
 Example test_sum1:              count 1 (sum [1;2;3] [1;4;1]) = 3.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
-Definition add (v:nat) (s:bag) : bag
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition add (v:nat) (s:bag) : bag := 
+  v :: s.
+  
 
 Example test_add1:                count 1 (add 1 [1;4;1]) = 3.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 Example test_add2:                count 5 (add 1 [1;4;1]) = 0.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
-Definition member (v:nat) (s:bag) : bool
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition member (v:nat) (s:bag) : bool := 
+  if ( count v s ) =? 0 then false else true.  
 
 Example test_member1:             member 1 [1;4;1] = true.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_member2:             member 2 [1;4;1] = false.
-(* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 (** [] *)
 
 (** **** 练习：3 星, standard, optional (bag_more_functions) 
@@ -392,44 +422,55 @@ Example test_member2:             member 2 [1;4;1] = false.
     （本练习为选做，但高级班的学生为了完成后面的练习，需要写出 [remove_one]
     的定义。） *)
 
-Fixpoint remove_one (v:nat) (s:bag) : bag
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint remove_one (v:nat) (s:bag) : bag :=
+  match s with 
+  | nil => nil
+  | h :: t => if (eqb h v) then t
+              else h::(remove_one v t)
+  end.
 
 Example test_remove_one1:
   count 5 (remove_one 5 [2;1;5;4;1]) = 0.
-  (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_remove_one2:
   count 5 (remove_one 5 [2;1;4;1]) = 0.
-  (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_remove_one3:
   count 4 (remove_one 5 [2;1;4;5;1;4]) = 2.
-  (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_remove_one4:
   count 5 (remove_one 5 [2;1;5;4;5;1;4]) = 1.
-  (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
-Fixpoint remove_all (v:nat) (s:bag) : bag
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint remove_all (v:nat) (s:bag) : bag :=
+  match s with 
+  | nil => nil
+  | h :: t => if (eqb v h) then (remove_all v t)
+              else h::(remove_all v t)
+  end.
 
 Example test_remove_all1:  count 5 (remove_all 5 [2;1;5;4;1]) = 0.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 Example test_remove_all2:  count 5 (remove_all 5 [2;1;4;1]) = 0.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 Example test_remove_all3:  count 4 (remove_all 5 [2;1;4;5;1;4]) = 2.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 Example test_remove_all4:  count 5 (remove_all 5 [2;1;5;4;5;1;4;5;1;4]) = 0.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
-Fixpoint subset (s1:bag) (s2:bag) : bool
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint subset (s1 : bag) (s2 : bag) : bool :=
+  match s1 with
+  | nil => true
+  | h :: t => (count h s1 <=? count h s2) && subset t s2
+  end.
 
 Example test_subset1:              subset [1;2] [2;1;4;1] = true.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 Example test_subset2:              subset [1;2;2] [2;1;4;1] = false.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard, recommended (bag_theorem) 
@@ -713,17 +754,38 @@ Qed.
 Theorem app_nil_r : forall l : natlist,
   l ++ [] = l.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros l.
+  induction l as [| n l' IHl'].
+  - simpl. reflexivity.
+  - simpl. rewrite IHl'. reflexivity. 
+Qed.
 
 Theorem rev_app_distr: forall l1 l2 : natlist,
   rev (l1 ++ l2) = rev l2 ++ rev l1.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros l1 l2.
+  induction l1 as [| n l1' IHl1'].
+  - simpl.
+    rewrite app_nil_r.
+    reflexivity.
+  - simpl.
+    rewrite IHl1'.
+    rewrite app_assoc.
+    reflexivity.
+Qed.
 
 Theorem rev_involutive : forall l : natlist,
   rev (rev l) = l.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros l.
+  induction l as [| n l' IHl'].
+  - simpl. reflexivity.
+  - simpl.
+    rewrite rev_app_distr.
+    rewrite IHl'.
+    simpl.
+    reflexivity.
+Qed.
 
 (** 下面的练习有简短的解法，如果你开始发现情况已经复杂到你无法理清的程度，
     请后退一步并试着寻找更为简单的方法。 *)
@@ -731,14 +793,33 @@ Proof.
 Theorem app_assoc4 : forall l1 l2 l3 l4 : natlist,
   l1 ++ (l2 ++ (l3 ++ l4)) = ((l1 ++ l2) ++ l3) ++ l4.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros l1 l2 l3 l4.
+  induction l1 as [| n l1' IHl1'].
+  - simpl.
+    rewrite app_assoc.
+    reflexivity.
+  - simpl.
+    rewrite IHl1'.
+    reflexivity.
+Qed.
 
 (** 一个关于你对 [nonzeros] 的实现的练习： *)
 
 Lemma nonzeros_app : forall l1 l2 : natlist,
   nonzeros (l1 ++ l2) = (nonzeros l1) ++ (nonzeros l2).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros l1 l2.
+  induction l1 as [| n l1' IHl1'].
+  - simpl. reflexivity.
+  - simpl.
+    destruct n
+    + simpl. 
+      rewrite IHl1'.
+      reflexivity.
+    + simpl.
+      rewrite IHl1'.
+      reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard (eqblist) 
@@ -746,25 +827,43 @@ Proof.
     填写 [eqblist] 的定义，它通过比较列表中的数字来判断是否相等。
     证明对于所有列表 [l]，[eqblist l l] 返回 [true]。 *)
 
-Fixpoint eqblist (l1 l2 : natlist) : bool
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint eqblist (l1 l2 : natlist) : bool :=
+  match l1, l2 with
+  | nil, nil => true
+  | nil, _ :: _ => false
+  | _ :: _, nil => false
+  | h1 :: t1, h2 :: t2 => eqb h1 h2 && eqblist t1 t2
+  end.
 
 Example test_eqblist1 :
   (eqblist nil nil = true).
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_eqblist2 :
   eqblist [1;2;3] [1;2;3] = true.
-(* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_eqblist3 :
   eqblist [1;2;3] [1;2;4] = false.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Theorem eqblist_refl : forall l:natlist,
   true = eqblist l l.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros l.
+  induction l as [| n l' IHl'].
+  - simpl. reflexivity.
+  - simpl. 
+  rewrite <- IHl'. 
+  assert (H: n =? n = true).
+  {
+  induction n as [| n' IHn'].
+  - simpl. reflexivity.
+  - simpl. apply IHn'.
+  }
+  rewrite H.
+  reflexivity.
+Qed.
 (** [] *)
 
 (* ================================================================= *)
@@ -776,7 +875,12 @@ Proof.
 Theorem count_member_nonzero : forall (s : bag),
   1 <=? (count 1 (1 :: s)) = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros s.
+  induction s as [| n s' IHs'].
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+Qed.
+
 (** [] *)
 
 (** 下面这条关于 [leb] 的引理可助你完成下一个证明。 *)
@@ -796,7 +900,18 @@ Proof.
 Theorem remove_does_not_increase_count: forall (s : bag),
   (count 0 (remove_one 0 s)) <=? (count 0 s) = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros s.
+  induction s as [| n s' IHs'].
+  - simpl. reflexivity.
+  - simpl.
+    destruct n.
+    + simpl.
+      rewrite leb_n_Sn.
+      reflexivity.
+    + simpl.
+      rewrite IHs'.
+      reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, standard, optional (bag_count_sum) 
@@ -815,7 +930,15 @@ Proof.
 
     （这个问题既可以用简单的方式解决也可以用繁琐的方式来解决。） *)
 
-(* 请在此处解答 *)
+Theorem rev_injective :
+forall (l1 l2 : natlist), rev l1 = rev l2 -> l1 = l2.
+Proof.
+  intros l1 l2 H.
+  rewrite <- rev_involutive.
+  rewrite <- H.
+  rewrite rev_involutive.
+  reflexivity.
+Qed.
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_rev_injective : option (nat*string) := None.
@@ -894,17 +1017,20 @@ Definition option_elim (d : nat) (o : natoption) : nat :=
 (** **** 练习：2 星, standard (hd_error)  *)
  (** 用同样的思路修正之前的 [hd] 函数，使我们无需为 [nil] 的情况提供默认元素。  *)
 
-Definition hd_error (l : natlist) : natoption
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition hd_error (l : natlist) : natoption :=
+  match l with
+  | nil => None
+  | a :: l => Some a
+  end.
 
 Example test_hd_error1 : hd_error [] = None.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_hd_error2 : hd_error [1] = Some 1.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_hd_error3 : hd_error [5;6] = Some 5.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 (** [] *)
 
 (** **** 练习：1 星, standard, optional (option_elim_hd)  *)
@@ -913,7 +1039,11 @@ Example test_hd_error3 : hd_error [5;6] = Some 5.
 Theorem option_elim_hd : forall (l:natlist) (default:nat),
   hd default l = option_elim default (hd_error l).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros l default.
+  destruct l as [| n l'].
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+Qed.
 (** [] *)
 
 End NatList.
@@ -942,8 +1072,16 @@ Definition eqb_id (x1 x2 : id) :=
 (** **** 练习：1 星, standard (eqb_id_refl)  *)
 Theorem eqb_id_refl : forall x, true = eqb_id x x.
 Proof.
-  (* 请在此处解答 *) Admitted.
-(** [] *)
+  intros x.
+  destruct x as [n].
+  simpl.
+  induction n as [| n' IHn'].
+  - reflexivity.
+  - simpl.
+    rewrite IHn'.
+    reflexivity.
+Qed.
+
 
 (** 现在我们定义偏映射的类型： *)
 
@@ -983,7 +1121,12 @@ Theorem update_eq :
   forall (d : partial_map) (x : id) (v: nat),
     find x (update d x v) = Some v.
 Proof.
- (* 请在此处解答 *) Admitted.
+ intros d x v.
+ simpl.
+ rewrite <- eqb_id_refl.
+ reflexivity.
+Qed.
+
 (** [] *)
 
 (** **** 练习：1 星, standard (update_neq)  *)
@@ -991,7 +1134,12 @@ Theorem update_neq :
   forall (d : partial_map) (x y : id) (o: nat),
     eqb_id x y = false -> find x (update d y o) = find x d.
 Proof.
- (* 请在此处解答 *) Admitted.
+ intros d x y o.
+ intros H.
+ simpl.
+ rewrite H.
+ reflexivity.
+Qed.
 (** [] *)
 End PartialMap.
 
@@ -1005,6 +1153,8 @@ Inductive baz : Type :=
 
 (** 有_'多少'_个表达式具备类型 [baz]？（以注释说明。） *)
 
+(* zero ? *)
+
 (* 请在此处解答 *)
 
 (* 请勿修改下面这一行： *)
@@ -1012,3 +1162,4 @@ Definition manual_grade_for_baz_num_elts : option (nat*string) := None.
 (** [] *)
 
 (* 2022-03-14 05:26:56 (UTC+00) *)
+(* finish by zerick 2025-10-18 10:39:00 (UTC+8) *)
