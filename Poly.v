@@ -124,14 +124,15 @@ Inductive grumble (X:Type) : Type :=
 
 (** 对于某个类型 [X]，以下哪些是 [grumble X] 良定义的元素？
     （在各选项后填“是”或“否”。）
-      - [d (b a 5)]
-      - [d mumble (b a 5)]
-      - [d bool (b a 5)]
-      - [e bool true]
-      - [e mumble (b c 0)]
-      - [e bool (b c 0)]
-      - [c] *)
-(* 请在此处解答 *)
+      - [d (b a 5)] yes
+      - [d mumble (b a 5)] no
+      - [d bool (b a 5)] no
+      - [e bool true] yes
+      - [e mumble (b c 0)] yes
+      - [e bool (b c 0)] no
+      - [c] no 
+      *) 
+(* e 可以接受类型 d 只接受构造子 *)
 End MumbleGrumble.
 
 (* 请勿修改下面这一行： *)
@@ -339,17 +340,37 @@ Definition list123''' := [1; 2; 3].
 Theorem app_nil_r : forall (X:Type), forall l:list X,
   l ++ [] = l.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros X l.
+  induction l as [| h l' IHl'].
+  - reflexivity.
+  - simpl.
+    rewrite IHl'.
+    reflexivity.
+Qed.
+
 
 Theorem app_assoc : forall A (l m n:list A),
   l ++ m ++ n = (l ++ m) ++ n.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros A l m n.
+  induction l as [| h l' IHl'].
+  - reflexivity.
+  - simpl.
+    rewrite IHl'.
+    reflexivity.
+Qed.
+
 
 Lemma app_length : forall (X:Type) (l1 l2 : list X),
   length (l1 ++ l2) = length l1 + length l2.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros X l1 l2.
+  induction l1 as [| h l1' IHl1'].
+  - reflexivity.
+  - simpl.
+    rewrite IHl1'.
+    reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard, optional (more_poly_exercises) 
@@ -359,12 +380,28 @@ Proof.
 Theorem rev_app_distr: forall X (l1 l2 : list X),
   rev (l1 ++ l2) = rev l2 ++ rev l1.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros X l1 l2.
+  induction l1 as [| h l1' IHl1'].
+  + simpl.
+    rewrite app_nil_r.
+    reflexivity.
+  + simpl.
+    rewrite IHl1'.
+    rewrite app_assoc.
+    reflexivity.
+Qed.
 
 Theorem rev_involutive : forall X : Type, forall l : list X,
   rev (rev l) = l.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros X l.
+  induction l as [| h l IHl'].
+  - simpl. reflexivity.
+  - simpl. 
+    rewrite rev_app_distr.
+    rewrite IHl'.
+    reflexivity.
+Qed.
 (** [] *)
 
 (* ================================================================= *)
@@ -428,6 +465,8 @@ Fixpoint combine {X Y : Type} (lx : list X) (ly : list Y)
 
         Compute (combine [1;2] [false;false;true;true]).
 *)
+Compute (combine [1;2] [false;false;true;true]).
+(* list (nat * bool) *)
 (** [] *)
 
 (** **** 练习：2 星, standard, recommended (split) 
@@ -438,14 +477,19 @@ Fixpoint combine {X Y : Type} (lx : list X) (ly : list Y)
 
     请在下面完成 [split] 的定义，确保它能够通过给定的单元测试。 *)
 
-Fixpoint split {X Y : Type} (l : list (X*Y))
-               : (list X) * (list Y)
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint split {X Y : Type} (l : list (X*Y)) : 
+(list X) * (list Y) :=
+  match l with
+  | [] => ([], [])
+  | (x, y) :: t =>
+      let (xs, ys) := split t in
+      (x :: xs, y :: ys)
+  end.  
 
 Example test_split:
   split [(1,false);(2,false)] = ([1;2],[false;false]).
 Proof.
-(* 请在此处解答 *) Admitted.
+reflexivity. Qed.
 (** [] *)
 
 (* ================================================================= *)
@@ -486,17 +530,20 @@ Proof. reflexivity. Qed.
 
     请完成上一章中 [hd_error] 的多态定义，确保它能通过下方的单元测试。 *)
 
-Definition hd_error {X : Type} (l : list X) : option X
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition hd_error {X : Type} (l : list X) : option X :=
+  match l with
+  | nil => None
+  | h :: t => Some h
+  end.
 
 (** 再说一遍，要强制将隐式参数转为显式参数，我们可以在函数名前使用 [@]。 *)
 
 Check @hd_error : forall X : Type, list X -> option X.
 
 Example test_hd_error1 : hd_error [1;2] = Some 1.
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 Example test_hd_error2 : hd_error  [[1];[2]]  = Some [1].
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -598,16 +645,16 @@ Proof. reflexivity. Qed.
     使用 [filter]（而非 [Fixpoint]）来编写 Coq 函数 [filter_even_gt7]，
     它接受一个自然数列表作为输入，返回一个只包含大于 [7] 的偶数的列表。 *)
 
-Definition filter_even_gt7 (l : list nat) : list nat
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition filter_even_gt7 (l : list nat) : list nat :=
+  filter (fun n => andb (negb (n <=? 7)) (evenb n)) l.
 
 Example test_filter_even_gt7_1 :
   filter_even_gt7 [1;2;6;9;10;3;12;8] = [10;12;8].
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_filter_even_gt7_2 :
   filter_even_gt7 [5;2;6;19;129] = [].
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 (** [] *)
 
 (** **** 练习：3 星, standard (partition) 
@@ -625,13 +672,13 @@ Example test_filter_even_gt7_2 :
 Definition partition {X : Type}
                      (test : X -> bool)
                      (l : list X)
-                   : list X * list X
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+                   : list X * list X :=
+  (filter test l, filter (fun x => negb (test x)) l).
 
 Example test_partition1: partition oddb [1;2;3;4;5] = ([1;3;5], [2;4]).
-(* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 Example test_partition2: partition (fun x => false) [5;9;0] = ([], [5;9;0]).
-(* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 (** [] *)
 
 (* ================================================================= *)
@@ -675,10 +722,27 @@ Proof. reflexivity. Qed.
 
     请证明 [map] 和 [rev] 可交换。你可能需要定义一个辅助引理 *)
 
+Lemma map_app : forall (X Y : Type) (f : X -> Y) (l1 l2 : list X),
+  map f (l1 ++ l2) = map f l1 ++ map f l2.
+Proof.
+  intros X Y f l1 l2.
+  induction l1 as [| h l1' IHl1'].
+  - simpl. reflexivity.
+  - simpl. rewrite IHl1'. reflexivity.
+Qed.
+
 Theorem map_rev : forall (X Y : Type) (f : X -> Y) (l : list X),
   map f (rev l) = rev (map f l).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros X Y f l.
+  induction l as [| h l' IHl'].
+  - simpl. reflexivity.
+  - simpl. 
+    rewrite <- IHl'.
+    rewrite map_app.
+    reflexivity.
+Qed.
+  
 (** [] *)
 
 (** **** 练习：2 星, standard, recommended (flat_map) 
@@ -692,14 +756,17 @@ Proof.
       = [1; 2; 3; 5; 6; 7; 10; 11; 12].
 *)
 
-Fixpoint flat_map {X Y: Type} (f: X -> list Y) (l: list X)
-                   : (list Y)
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint flat_map {X Y: Type} (f: X -> list Y) (l: list X) : (list Y) :=
+  match l with
+  | nil => nil
+  | h :: t => app (f h) (flat_map f t)
+  end.
+  
 
 Example test_flat_map1:
   flat_map (fun n => [n;n;n]) [1;5;4]
   = [1; 1; 1; 5; 5; 5; 4; 4; 4].
- (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 (** [] *)
 
 (** [map] 这个函数不止对列表有意义，以下是一个在 [option] 上的 [map]：*)
@@ -718,7 +785,24 @@ Definition option_map {X Y : Type} (f : X -> Y) (xo : option X)
     Coq 检查你做的是否正确。（本练习并不会打分，你可以在本文件的_'副本'_中做它，
     之后丢掉即可。）
 *)
-(** [] *)
+(** 
+
+Fixpoint filter (X:Type) (test: X->bool) (l:list X) : (list X) :=
+  match l with
+  | []     => []
+  | h :: t => if test h then h :: (filter X test t)
+                        else       filter X test t
+  end.
+
+Fixpoint map (X Y: Type) (f:X->Y) (l:list X) : (list Y) :=
+  match l with
+  | []     => []
+  | h :: t => (f h) :: (map X Y f t)
+  end.
+
+(* 使用时必须显式提供类型参数 *)
+Example test_filter1: filter nat evenb [1;2;3;4] = [2;4].
+Example test_map1: map nat nat (fun x => x + 1) [1;2;3] = [2;3;4]. *)
 
 (* ================================================================= *)
 (** ** 折叠 *)
@@ -766,7 +850,7 @@ Proof. reflexivity. Qed.
     则是个接受 [X] 和 [Y] 并返回 [Y] 的二元操作符。你能想出一种 [X] 和
     [Y] 不同时的应用情景吗？ *)
 
-(* 请在此处解答 *)
+Compute fold ( fun (_ : bool) (n : nat) => S n ) [true;false].
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_fold_types_different : option (nat*string) := None.
@@ -838,18 +922,38 @@ Proof. reflexivity. Qed.
 Theorem fold_length_correct : forall X (l : list X),
   fold_length l = length l.
 Proof.
-(* 请在此处解答 *) Admitted.
+  intros X l.
+  induction l as [| h l' IHl'].
+  - reflexivity.
+  - simpl. 
+  rewrite <- IHl'.
+  reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, standard (fold_map) 
 
     我们也可以用 [fold] 来定义 [map]。请完成下面的 [fold_map]。 *)
 
-Definition fold_map {X Y: Type} (f: X -> Y) (l: list X) : list Y
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
-
+Definition fold_map {X Y: Type} (f: X -> Y) (l: list X) : list Y :=
+  (fold (fun x acc => f x :: acc) l nil).
+  
+Example test_fold_map : 
+fold_map oddb [2;1;5] = [false;true;true].
+Proof. reflexivity. Qed.
 (** 在 Coq 中写出 [fold_map_correct] 来陈述 [fold_map] 是正确的，然后证明它。
     （提示：再次提醒，[reflexivity] 的化简力度比 [simpl] 更强。） *)
+Theorem fold_map_correct {X Y : Type}: forall X (l : list X) (f : X -> Y),
+  fold_map f l = map f l.
+Proof.
+  intros f l.
+  induction l as [| h l' IHl'].
+  - reflexivity.
+  - intros f0.
+    simpl. 
+    rewrite <- IHl'. 
+    reflexivity.
+Qed.
 
 (* 请在此处解答 *)
 
@@ -879,8 +983,7 @@ Definition prod_curry {X Y Z : Type}
     然后在下面证明它们互为反函数的定理。 *)
 
 Definition prod_uncurry {X Y Z : Type}
-  (f : X -> Y -> Z) (p : X * Y) : Z
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+  (f : X -> Y -> Z) (p : X * Y) : Z := f (fst p) (snd p).
 
 (** 举一个柯里化用途的（平凡的）例子，我们可以用它来缩短之前看到的一个例子： *)
 
@@ -898,13 +1001,20 @@ Theorem uncurry_curry : forall (X Y Z : Type)
                         x y,
   prod_curry (prod_uncurry f) x y = f x y.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros f x y.
+  simpl. 
+  reflexivity. 
+Qed.
 
 Theorem curry_uncurry : forall (X Y Z : Type)
                         (f : (X * Y) -> Z) (p : X * Y),
   prod_uncurry (prod_curry f) p = f p.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros X Y Z f p.
+  simpl. 
+  destruct p as [x y].
+  reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, advanced (nth_error_informal) 
@@ -963,52 +1073,55 @@ Definition three : cnat := @doit3times.
 
 (** 自然数的后继：给定一个邱奇数 [n]，它的后继 [succ n] 是一个把它的参数比 [n]
     还多迭代一次的函数。 *)
-Definition succ (n : cnat) : cnat
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition succ (n : cnat) : cnat :=
+  fun (X : Type) (f : X -> X) (x : X) =>
+    f (n X f x).
 
 Example succ_1 : succ zero = one.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example succ_2 : succ one = two.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example succ_3 : succ two = three.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 (** [] *)
 
 (** **** 练习：1 星, advanced (church_plus)  *)
 
 (** 两邱奇数相加： *)
-Definition plus (n m : cnat) : cnat
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition plus (n m : cnat) : cnat := 
+  fun (X : Type) (f : X -> X) (x : X) =>
+    n X f (m X f x).
 
 Example plus_1 : plus zero one = one.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example plus_2 : plus two three = plus three two.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example plus_3 :
   plus (plus two two) three = plus one (plus three three).
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 (** [] *)
 
 (** **** 练习：2 星, advanced (church_mult)  *)
 
 (** 乘法： *)
-Definition mult (n m : cnat) : cnat
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition mult (n m : cnat) : cnat :=
+  fun X (f : X -> X) (x : X) =>
+    n X (m X f) x.
 
 Example mult_1 : mult one one = one.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example mult_2 : mult zero (plus three three) = zero.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example mult_3 : mult two three = plus three three.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 (** [] *)
 
@@ -1020,17 +1133,18 @@ Proof. (* 请在此处解答 *) Admitted.
     如果你遇到了「Universe inconsistency，全域不一致」错误，请在不同的类型上迭
     代。在 [cnat] 本身上迭代通常会有问题。） *)
 
-Definition exp (n m : cnat) : cnat
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition exp (n m : cnat) : cnat := 
+  fun (X : Type) (f : X -> X) (x : X) =>
+    m (X -> X) (n X) f x.
 
 Example exp_1 : exp two two = plus two two.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example exp_2 : exp three zero = one.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example exp_3 : exp three two = plus (mult two (mult two two)) one.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 (** [] *)
 
@@ -1040,3 +1154,4 @@ End Exercises.
 
 
 (* 2022-03-14 05:26:56 (UTC+00) *)
+(*finish by zerick 2025-10-19 16:13:00 (UTC+8)*)
