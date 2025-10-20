@@ -64,7 +64,11 @@ Theorem silly_ex :
      evenb 4 = true ->
      oddb 3 = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros H eq1.
+  apply H.
+  apply eq1.
+Qed.
+
 (** [] *)
 
 (** 要使用 [apply] 策略，被应用的事实（的结论）必须精确地匹配证明目标：
@@ -92,7 +96,13 @@ Theorem rev_exercise1 : forall (l l' : list nat),
      l = rev l' ->
      l' = rev l.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  Search rev.
+  intros l l' eq1.
+  rewrite eq1.
+  symmetry.
+  apply rev_involutive.
+Qed.
+
 (** [] *)
 
 (** **** 练习：1 星, standard, optional (apply_rewrite) 
@@ -154,7 +164,11 @@ Example trans_eq_exercise : forall (n m o p : nat),
      (n + p) = m ->
      (n + p) = (minustwo o).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m o p eq1 eq2.
+  apply trans_eq with (m).
+  apply eq2. 
+  apply eq1. 
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -244,7 +258,15 @@ Example injection_ex3 : forall (X : Type) (x y z : X) (l j : list X),
   j = z :: l ->
   x = y.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros X x y z l j H1 H2.    (* 引入前提 *)
+  injection H1 as H3 H4.    (* 使用 injection 解构等式 *)
+  rewrite H3.
+  symmetry in H4.
+  rewrite H4 in H2.
+  injection H2 as ->.
+  reflexivity.
+Qed.
+
 (** [] *)
 
 (** So much for injectivity of constructors.  What about disjointness?
@@ -312,7 +334,9 @@ Example discriminate_ex3 :
     x :: y :: l = [] ->
     x = z.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros X x y z l j H.
+  discriminate H.
+Qed.
 (** [] *)
 
 
@@ -522,7 +546,20 @@ Proof.
 Theorem eqb_true : forall n m,
     n =? m = true -> n = m.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n.
+  induction n as [| n' IHn'].
+  - intros m.
+    destruct m.
+    + simpl. reflexivity.
+    + discriminate.
+  - intros m eq.
+    destruct m as [| m'].
+    + discriminate.
+    + simpl in eq.
+      apply IHn' in eq.
+      apply f_equal.
+      apply eq.
+Qed. 
 (** [] *)
 
 (** **** 练习：2 星, advanced (eqb_true_informal) 
@@ -543,8 +580,22 @@ Theorem plus_n_n_injective : forall n m,
      n + n = m + m ->
      n = m.
 Proof.
-  intros n. induction n as [| n'].
-  (* 请在此处解答 *) Admitted.
+  intros n. induction n as [| n' IHn'].
+  + destruct m.
+   - simpl. reflexivity.
+   - simpl.
+     discriminate.
+  + destruct m.
+   - simpl. discriminate.
+   - simpl.
+     intros H.
+     f_equal.
+     rewrite <- plus_n_Sm in H.
+     rewrite <- plus_n_Sm in H.
+     injection H.
+     apply IHn'.
+Qed. 
+
 (** [] *)
 
 (** 在 [induction] 之前做一些 [intros] 来获得更一般归纳假设并不总是奏效。
@@ -643,7 +694,20 @@ Theorem nth_error_after_last: forall (n : nat) (X : Type) (l : list X),
      length l = n ->
      nth_error l n = None.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n X l.
+  generalize dependent n.  (* 关键：在归纳前泛化 n *)
+  induction l as [| h l' IHl'].
+  - intros n H.
+    simpl in H. rewrite <- H. reflexivity.
+  - intros n H.
+    destruct n as [| n'].
+    + simpl in H. discriminate.
+    + simpl in H. injection H as H.
+      simpl.
+      apply IHl'.
+      exact H.
+Qed.
+
 (** [] *)
 
 (* ################################################################# *)
@@ -801,7 +865,27 @@ Theorem combine_split : forall X Y (l : list (X * Y)) l1 l2,
   split l = (l1, l2) ->
   combine l1 l2 = l.
 Proof.
-  (* 请在此处解答 *) Admitted.
+intros X Y l l1 l2.
+  generalize dependent l2.
+  generalize dependent l1.
+  induction l as [| h l' IHl'].
+  + intros l1 l2 H.
+    simpl in H.
+    injection H as H1 H2.
+    rewrite <- H1, <- H2.
+    reflexivity.
+  + intros l1 l2 H.
+    simpl in H.
+    destruct h as [x y].
+    destruct (split l') as [lx ly].
+    injection H as H1 H2.
+    rewrite <- H1, <- H2.
+    simpl.
+    f_equal.
+    apply IHl'.
+    reflexivity.
+Qed.
+       
 (** [] *)
 
 (** [destruct] 策略的 [eqn:] 部分是可选的：目前，我们大部分时间都会包含它，
@@ -868,7 +952,21 @@ Theorem bool_fn_applied_thrice :
   forall (f : bool -> bool) (b : bool),
   f (f (f b)) = f b.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros f b.
+  destruct b eqn:Beq.
+  - destruct (f true) eqn:f1.
+    + rewrite f1. apply f1.
+    + destruct (f false) eqn:f2.
+      * exact f1.
+      * exact f2.
+  - destruct (f true) eqn:f1.
+    + destruct (f false) eqn:f2.
+      * rewrite f1. exact f1.
+      * rewrite f2. exact f2.
+    + destruct (f false) eqn:f2.
+      * rewrite f1. exact f2.
+      * rewrite f2. exact f2.
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -932,7 +1030,24 @@ Proof.
 Theorem eqb_sym : forall (n m : nat),
   (n =? m) = (m =? n).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m.
+  destruct (n =? m) eqn:E1.
+  + (* n =? m = true 的情况 *)
+    symmetry.
+    apply eqb_true in E1.
+    rewrite E1.
+    symmetry.
+    apply eqb_refl.
+  + (* n =? m = false 的情况 *)
+    symmetry.
+    destruct (m =? n) eqn:E2.
+    - (* 如果 m =? n = true，产生矛盾 *)
+      apply eqb_true in E2.
+      rewrite E2 in E1.
+      rewrite <- eqb_refl in E1.
+      discriminate.
+    - reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, advanced, optional (eqb_sym_informal) 
@@ -952,7 +1067,14 @@ Theorem eqb_trans : forall n m p,
   m =? p = true ->
   n =? p = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m p H1 H2.
+  apply eqb_true in H1.
+  apply eqb_true in H2.
+  rewrite H1.
+  rewrite H2.
+  symmetry.
+  apply eqb_refl with (n:=p).
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, advanced (split_combine) 
@@ -966,13 +1088,31 @@ Proof.
     提示：你需要 [l1] 和 [l2] 的什么性质来保证
     [split (combine l1 l2) = (l1,l2)] 成立？） *)
 
-Definition split_combine_statement : Prop
-  (* （“[: Prop]” 表示我们在这里给出了一个逻辑命题。） *)
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition split_combine_statement : Prop := 
+  forall X Y (l1 : list X) (l2 : list Y),
+  length l1 = length l2 ->
+  split (combine l1 l2) = (l1, l2).
 
 Theorem split_combine : split_combine_statement.
 Proof.
-(* 请在此处解答 *) Admitted.
+  unfold split_combine_statement.
+  intros X Y l1.
+  induction l1 as [| x l1' IHl1'].
+  - intros l2 Hlen.
+    destruct l2.
+    + reflexivity.
+    + discriminate.
+  - intros l2 Hlen.
+    destruct l2 as [| y l2'].
+    + discriminate.
+    + simpl.
+      simpl in Hlen.
+      injection Hlen as Hlen.
+      assert (H: split (combine l1' l2') = (l1', l2')).
+      { apply IHl1'. exact Hlen. }
+      rewrite H.
+      reflexivity.
+Qed.
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_split_combine : option (nat*string) := None.
@@ -987,7 +1127,29 @@ Theorem filter_exercise : forall (X : Type) (test : X -> bool)
      filter test l = x :: lf ->
      test x = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros X test x l lf H.
+  destruct (test x) eqn:E.
+  - (* test x = true *)
+    reflexivity.
+  - (* test x = false，推出矛盾 *)
+    (* 需要对 l 进行归纳来得到矛盾 *)
+    induction l as [| h l' IHl'].
+    + (* l = [] *)
+      simpl in H.
+      discriminate.
+    + (* l = h :: l' *)
+      simpl in H.
+      destruct (test h) eqn:Eh.
+      * (* test h = true *)
+        injection H as H1 H2.
+        rewrite <- H1 in E.
+        rewrite Eh in E.
+        discriminate.
+      * (* test h = false *)
+        apply IHl'.
+        exact H.
+Qed.
+  
 (** [] *)
 
 (** **** 练习：4 星, advanced, recommended (forall_exists_challenge) 
@@ -1017,45 +1179,75 @@ Proof.
 
     最后，证明定理 [existsb_existsb'] 指出 [existsb'] 和 [existsb] 的行为相同。 *)
 
-Fixpoint forallb {X : Type} (test : X -> bool) (l : list X) : bool
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint forallb {X : Type} (test : X -> bool) (l : list X) : bool :=
+  match l with
+  | [] => true                  (* 空列表返回 true *)
+  | h :: t => test h && forallb test t  (* 对头元素应用 P，并且递归检查尾部 *)
+  end.
 
 Example test_forallb_1 : forallb oddb [1;3;5;7;9] = true.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_forallb_2 : forallb negb [false;false] = true.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_forallb_3 : forallb evenb [0;2;4;5] = false.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_forallb_4 : forallb (eqb 5) [] = true.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
-Fixpoint existsb {X : Type} (test : X -> bool) (l : list X) : bool
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint existsb {X : Type} (test : X -> bool) (l : list X) : bool :=
+  match l with
+  | [] => false
+  | h :: t => test h || existsb test t
+  end.
 
 Example test_existsb_1 : existsb (eqb 5) [0;2;3;6] = false.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_existsb_2 : existsb (andb true) [true;true;false] = true.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_existsb_3 : existsb oddb [1;0;0;0;0;3] = true.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example test_existsb_4 : existsb evenb [] = false.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
-Definition existsb' {X : Type} (test : X -> bool) (l : list X) : bool
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition existsb' {X : Type} (test : X -> bool) (l : list X) : bool :=
+  negb (forallb (fun x => negb (test x)) l).
 
 Theorem existsb_existsb' : forall (X : Type) (test : X -> bool) (l : list X),
   existsb test l = existsb' test l.
-Proof. (* 请在此处解答 *) Admitted.
-
+Proof. 
+  intros X test l.
+  induction l as [| h l' IHl'].
+  + reflexivity.
+  + destruct (test h) eqn:E1.
+    - unfold existsb.
+      rewrite E1.
+      simpl.
+      unfold existsb'.
+      unfold forallb.
+      rewrite E1.
+      simpl. 
+      reflexivity.
+    - simpl.
+      rewrite E1.
+      simpl.
+      unfold existsb'.
+      simpl.
+      rewrite E1.
+      simpl.
+      rewrite IHl'.
+      unfold existsb'.
+      reflexivity.
+Qed.
+      
 (** [] *)
 
 
 
 (* 2022-03-14 05:26:56 (UTC+00) *)
+(* finish by zerick 2025-10-20 22:35:00 (UTC+8)*)
