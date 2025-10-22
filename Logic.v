@@ -1906,9 +1906,78 @@ Definition de_morgan_not_and_not := forall P Q:Prop,
 Definition implies_to_or := forall P Q:Prop,
   (P->Q) -> (~P\/Q).
 
-(* 请在此处解答
+Theorem em_to_p : 
+  excluded_middle -> peirce.
+Proof.
+  unfold excluded_middle, peirce.
+  intros EM P Q HPQ.
+  destruct (EM P) as [HP | HnP].
+  - (* P 成立 *)
+    exact HP.
+  - (* ~ P 成立 *)
+    apply HPQ.
+    intros HP.
+    contradiction.
+Qed.
 
-    [] *)
+Theorem p_to_double_neg:
+  peirce -> double_negation_elimination.
+Proof.
+  unfold peirce, double_negation_elimination.
+  intros HP P HnnP.
+  apply (HP P False).
+  intros HnP.
+  contradiction.
+Qed.
+
+Theorem double_neg_to_de_morgan_nn:
+  double_negation_elimination -> de_morgan_not_and_not.
+Proof.
+  unfold double_negation_elimination.
+  unfold de_morgan_not_and_not.
+  intros HP P Q.
+  unfold not.
+  intros H2.
+  apply HP.
+  unfold not.
+  intros H.
+  apply H2.
+  split.
+  - intros HP_contra. apply H. left. exact HP_contra.
+  - intros HQ_contra. apply H. right. exact HQ_contra.
+Qed.
+
+Theorem de_morgan_nn_to_implies_to_or:
+  de_morgan_not_and_not -> implies_to_or.
+Proof.
+  unfold de_morgan_not_and_not.
+  unfold implies_to_or.
+  intros HPQ P Q.
+  intros H2.
+  apply HPQ.
+  unfold not.
+  intros [HnnP HnQ].
+  apply HnnP.
+  intros HP.
+  apply HnQ.
+  apply H2.
+  exact HP.
+Qed.
+
+Theorem implies_to_or_to_em:
+  implies_to_or -> excluded_middle.
+Proof.
+  unfold implies_to_or.
+  unfold excluded_middle.
+  intros HPQ.
+  intros P.
+  unfold not.
+  specialize (HPQ P P).
+  unfold not in HPQ.
+  destruct (HPQ (fun x => x)) as [HnP | HP].
+  - right. exact HnP.
+  - left. exact HP.
+Qed.
 
 (* 2022-03-14 05:26:56 (UTC+00) *)
 (* not finish yet *)
