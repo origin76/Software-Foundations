@@ -2127,7 +2127,184 @@ Proof.
        | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2 ].
   - (* MEmpty *)
     simpl. intros contra. inversion contra.
-  (* 请在此处解答 *) Admitted.
+  - (* MChar *)
+    simpl. intros contra. inversion contra. inversion H0.
+  - (* MApp *)
+    simpl. intros H.
+    rewrite app_length in H.
+    destruct (pumping_constant re1 <=? length s1) eqn:Hle1.
+    + (* pumping_constant re1 <= length s1 *)
+      apply leb_complete in Hle1.
+      apply IH1 in Hle1.
+      destruct Hle1 as [s11 [s12 [s13 [Heq1 [Hneq1 [Hlen1 Hpump1]]]]]].
+      exists s11, s12, (s13 ++ s2).
+      split.
+      * rewrite Heq1. rewrite <- app_assoc. rewrite <- app_assoc. reflexivity.
+      * split.
+        -- apply Hneq1.
+        -- split.
+           ++ apply le_trans with (n := pumping_constant re1).
+              ** apply Hlen1.
+              ** apply le_plus_l.
+           ++ intros m. rewrite app_assoc. rewrite app_assoc.
+              apply MApp.
+              ** rewrite <- app_assoc. apply Hpump1.
+              ** apply Hmatch2.
+    + (* pumping_constant re1 > length s1 *)
+      apply leb_complete_conv in Hle1.
+      assert (Hle2: pumping_constant re2 <= length s2).
+      {
+        destruct (pumping_constant re2 <=? length s2) eqn:Hle2.
+        - apply leb_complete. apply Hle2.
+        - apply leb_complete_conv in Hle2.
+          exfalso.
+          assert (Hcontra: length s1 + length s2 <= pumping_constant re1 + pumping_constant re2).
+          {
+            apply plus_le_compat.
+            - apply ltb_lt in Hle1. exact Hle1.
+            - apply ltb_lt in Hle2. apply Hle2.
+          }
+          apply le_not_lt with (n := pumping_constant re1 + pumping_constant re2)
+                              (m := length s1 + length s2).
+          ++ apply H.
+          ++ apply plus_lt_compat.
+             * exact Hle1.
+             * exact Hle2.
+      }
+      apply IH2 in Hle2.
+      destruct Hle2 as [s21 [s22 [s23 [Heq2 [Hneq2 [Hlen2 Hpump2]]]]]].
+      exists (s1 ++ s21), s22, s23.
+      split.
+      * rewrite Heq2. rewrite <- app_assoc. reflexivity.
+      * split.
+        -- apply Hneq2.
+        -- split.
+           ++ rewrite app_length.
+              apply le_trans with (n := length s1 + pumping_constant re2).
+              ** rewrite <- plus_assoc.
+                 apply plus_le_compat_l with (p := length s1). 
+                 apply Hlen2.
+              ** rewrite plus_comm.
+                 apply le_trans with (n := pumping_constant re1 + pumping_constant re2).
+                 --- rewrite plus_comm with (n := pumping_constant re1).
+                     apply plus_le_compat_l. 
+                     apply ltb_lt.
+                     apply Hle1.
+                 --- apply le_n.
+           ++ intros m. rewrite <- app_assoc. apply MApp.
+              ** apply Hmatch1.
+              ** apply Hpump2.
+  - (* MUnionL *)
+    simpl. intros H.
+    assert (H1: pumping_constant re1 <= length s1).
+    {
+      apply (le_trans _ (max (pumping_constant re1) (pumping_constant re2)) _).
+      - apply le_max_l.
+      - apply plus_le in H.
+        destruct H as [H1 H2].
+        apply max_lub.
+        + exact H1.
+        + exact H2.
+    }
+    apply IH in H1.
+    destruct H1 as [s11 [s12 [s13 [Heq [Hneq [Hlen Hpump]]]]]].
+    exists s11, s12, s13.
+    split. apply Heq. 
+    split. apply Hneq.
+    split.
+    + apply le_trans with (n := pumping_constant re1).
+      * apply Hlen.
+      * apply le_plus_l.
+    + intros m. apply MUnionL. apply Hpump.
+  - (* MUnionR *)
+    simpl. intros H.
+    assert (H2: pumping_constant re2 <= length s2).
+    {
+      apply (le_trans _ (max (pumping_constant re1) (pumping_constant re2)) _).
+      - apply le_max_r.
+      - apply plus_le in H.
+        destruct H as [H1 H2].
+        apply max_lub.
+        + exact H1.
+        + exact H2.
+    }
+    apply IH in H2.
+    destruct H2 as [s21 [s22 [s23 [Heq [Hneq [Hlen Hpump]]]]]].
+    exists s21, s22, s23.
+    split. apply Heq.
+    split. apply Hneq.
+    split.
+    + apply le_trans with (n := pumping_constant re2).
+      * apply Hlen.
+      * rewrite plus_comm.
+        apply le_plus_l.
+    + intros m. apply MUnionR. apply Hpump.
+  - (* MStar0 *)
+    simpl. intros H. inversion H.
+    apply pumping_constant_0_false in H1.
+    exfalso. exact H1.
+  - (* MStarApp *)
+    simpl. intros H.
+    destruct s1.
+    + (* s1 = [] *)
+      simpl in *. apply IH2 in H.
+      destruct H as [s21 [s22 [s23 [Heq [Hneq [Hlen Hpump]]]]]].
+      exists s21, s22, s23.
+      split. apply Heq. 
+      split. apply Hneq.
+      split. apply Hlen.
+      intros m. apply Hpump.
+    + (* s1 = x :: s1 *)
+      destruct (pumping_constant re <=? length (x :: s1)) eqn:Hle.
+      * (* pumping_constant re <= length (x :: s1) *)
+        apply leb_complete in Hle.
+        apply IH1 in Hle.
+        destruct Hle as [s11 [s12 [s13 [Heq1 [Hneq1 [Hlen1 Hpump1]]]]]].
+        exists s11, s12, (s13 ++ s2).
+        split.
+        -- rewrite Heq1. rewrite <- app_assoc. rewrite <- app_assoc. reflexivity.
+        -- split.
+          ++ apply Hneq1.
+          ++ split.
+              ** apply le_trans with (n := pumping_constant re).
+                --- apply Hlen1.
+                --- apply le_n.
+              ** intros m. rewrite app_assoc. rewrite app_assoc.
+                apply MStarApp.
+                --- rewrite <- app_assoc. apply Hpump1.
+                --- apply Hmatch2.
+      * (* pumping_constant re > length (x :: s1) *)
+        (* 此时我们选择 [], (x :: s1), s2 *)
+        exists [], (x :: s1), s2.
+        split. reflexivity.
+        split. intros contra. inversion contra.
+        split.
+        -- simpl.
+        (* 需要证明 S (length s1) <= pumping_constant re *)
+        (* 但这可能不成立！我们需要用不同的策略 *)
+        apply leb_complete_conv in Hle.
+        (* Hle: length (x :: s1) < pumping_constant re *)
+        (* 即 S (length s1) < pumping_constant re *)
+        (* 所以 S (length s1) <= pumping_constant re - 1 *)
+        (* 但实际上 a < b 意味着 S a <= b *)
+        unfold lt in Hle.
+        assert (Heq: length (x :: s1) = S (length s1)).
+        { simpl. reflexivity. }
+        rewrite Heq in Hle.
+        apply le_S in Hle.
+        apply le_S_n in Hle.
+        exact Hle.
+        -- intros m. simpl.
+          induction m.
+          ++ simpl. apply Hmatch2.
+          ++ simpl.
+              assert (Heq: x :: (s1 ++ napp m (x :: s1)) ++ s2 =
+                      (x :: s1) ++ napp m (x :: s1) ++ s2).
+              { simpl. rewrite <- app_assoc. simpl. rewrite app_assoc. reflexivity. }
+              rewrite Heq. apply MStarApp.
+              ** apply Hmatch1.
+              ** apply IHm.
+Qed.
 
 End Pumping.
 (** [] *)
