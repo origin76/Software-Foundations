@@ -784,7 +784,6 @@ Qed.
 Theorem leb_complete : forall n m,
   n <=? m = true -> n <= m.
 Proof.
-Proof.
   intros n m H.
   generalize dependent m.
   induction n as [| n' IHn'].
@@ -802,8 +801,7 @@ Proof.
       apply le_n_S.
       apply IHn'.
       exact H.
-Qed.
-
+Qed.    
 (** 提示：在下面的问题中，对 [m] 进行归纳会使证明容易一些。*)
 
 Theorem leb_correct : forall n m,
@@ -829,6 +827,41 @@ Proof.
       * apply le_n.
       * apply le_S_n.
         exact H.
+Qed.
+
+Theorem leb_complete_conv : forall n m,
+  n <=? m = false -> m < n.
+Proof.
+  intros n m H.
+  generalize dependent m.
+  induction n as [| n' IHn'].
+  - (* n = 0 *)
+    intros m H.
+    assert (Hcontra: (0 <=? m) = true).
+    { apply leb_correct. apply O_le_n. }
+    rewrite H in Hcontra.
+    discriminate Hcontra.
+  - (* n = S n' *)
+    intros m H.
+    destruct m as [| m'].
+    + (* m = 0 *)
+      unfold lt.
+      apply le_n_S. 
+      apply le_0_n.
+    + (* m = S m' *)
+      apply n_le_m__Sn_le_Sm.
+      apply IHn'.
+      simpl in H.
+      apply H.
+Qed.
+
+Lemma ltb_lt : forall n m : nat, n < m -> n <= m.
+Proof.
+  intros n m Hlt.
+  unfold lt in Hlt.
+  apply le_trans with (n := S n).
+  - apply le_S. apply le_n.
+  - apply Hlt.
 Qed.
 
 
@@ -1751,6 +1784,172 @@ Proof.
     + apply IHm.
 Qed.
 
+Lemma minus_n_O : forall n,
+  n - 0 = n.
+Proof.
+  intros n.
+  unfold minus.
+  destruct n; reflexivity.
+Qed.
+  
+Lemma minus_plus : forall n m,
+  n + m - n = m.
+Proof.
+  intros n m.
+  induction n.
+  - simpl. rewrite <- minus_n_O. reflexivity.
+  - simpl. rewrite <- minus_n_O. 
+    rewrite IHn. rewrite minus_n_O. reflexivity.
+Qed.
+
+Lemma le_plus_minus : forall n m,
+  m <= n -> n = m + (n - m).
+Proof.
+  intros n m H.
+  induction H.
+  - rewrite  minus_diag. rewrite <- plus_n_O. reflexivity.
+  - rewrite IHle. 
+    rewrite plus_n_Sm.
+    f_equal. symmetry. apply minus_plus. 
+Qed.
+
+Lemma plus_le_compat_l : forall n m p,
+  n <= m -> p + n <= p + m.
+Proof.
+  intros n m p H.
+  induction p.
+  - simpl. apply H.
+  - simpl. apply le_n_S. apply IHp.
+Qed.
+
+Lemma le_max_l : forall n m, n <= max n m.
+Proof.
+  intros n m.
+  generalize dependent m.
+  induction n.
+  - apply O_le_n.
+  - destruct m.
+    + simpl. apply le_n.
+    + simpl. apply le_n_S. apply IHn.
+Qed.
+
+Lemma le_max_r : forall n m, m <= max n m.
+Proof.
+  intros n m.
+  generalize dependent m.
+  induction n.
+  - simpl. apply le_n.
+  - destruct m.
+    + simpl. apply O_le_n.
+    + simpl. apply le_n_S. apply IHn.
+Qed.
+
+Lemma plus_le_compat : forall n m p q,
+  n <= p -> m <= q -> n + m <= p + q.
+Proof.
+  intros n m p q H1 H2.
+  induction H1.
+  - (* n = p *)
+    induction H2.
+    + (* m = q *)
+      apply le_n.
+    + (* m <= m0, 需证 p + m <= p + S m0 *)
+      rewrite <- plus_n_Sm. apply le_S. apply IHle.
+  - (* n <= m0, 需证 n + m <= S m0 + q *)
+    apply le_S.
+    apply IHle.
+Qed.
+
+Lemma Sn_le_m__n_le_m : forall n m,
+  S n <= m -> n <= m.
+Proof.
+  intros n m H.
+  apply le_trans with (n := S n).
+  - apply le_S. apply le_n.
+  - apply H.
+Qed.
+
+Lemma plus_lt_compat : forall n m p q,
+  n < p -> m < q -> n + m < p + q.
+Proof.
+  intros n m p q H1 H2.
+  unfold lt in *.
+  (* H1: S n <= p, H2: S m <= q *)
+  (* 要证: S (n + m) <= p + q *)
+  rewrite  plus_n_Sm.
+  apply plus_le_compat.
+  - apply Sn_le_m__n_le_m. apply H1.
+  - apply H2.
+Qed.
+
+Lemma lt_irrefl : forall n,
+  ~ (n < n).
+Proof.
+  unfold not.
+  intros n H.
+  induction n.
+  - (* n = 0 *)
+    inversion H.
+  - (* n = S n *)
+    apply IHn.
+    apply Sn_le_Sm__n_le_m.
+    apply H.
+Qed.
+
+Lemma lt_S_n : forall n m,
+  S n < S m -> n < m.
+Proof.
+  intros n m H.
+  unfold lt in *.
+  (* H: S (S n) <= S m *)
+  (* 目标: S n <= m *)
+  apply le_S_n.
+  apply H.
+Qed.
+
+Lemma le_not_lt : forall n m,
+  n <= m -> ~ (m < n).
+Proof.
+  intros n m H.
+  unfold not. intros contra.
+  induction H.
+  - apply lt_irrefl with (n := n). apply contra.
+  - apply IHle. 
+    apply le_trans with (n := S m).
+    + unfold lt. apply le_n.
+    + unfold lt in contra.
+      apply le_S in contra.
+      apply le_S_n in contra.
+      exact contra.
+Qed.
+
+Lemma max_lub : forall n m p,
+  n <= p -> m <= p -> max n m <= p.
+Proof.
+  intros n.
+  induction n as [| n' IHn].
+  - (* n = 0 *)
+    intros m p H1 H2.
+    simpl. apply H2.
+  - (* n = S n' *)
+    intros m p H1 H2.
+    destruct m as [| m'].
+    + (* m = 0 *)
+      simpl. apply H1.
+    + (* m = S m' *)
+      simpl.
+      (* 需要证明 S (max n' m') <= p *)
+      (* 从 S n' <= p 和 S m' <= p *)
+      destruct p as [| p'].
+      * (* p = 0，但 S n' <= 0 矛盾 *)
+        inversion H1.
+      * (* p = S p' *)
+        apply le_n_S.
+        apply IHn.
+        -- apply le_S_n. apply H1.
+        -- apply le_S_n. apply H2.
+Qed.
+
 (** （弱化的）泵引理是说，如果 [s =~ re] 且 [s] 的长度最小是 [re] 的抽取常数（pumping constant），
     那么 [s] 可分割成三个子字符串 [s1 ++ s2 ++ s3]，其中 [s2] 可被重复任意次，
     其结果同 [s1] 和 [s3] 合并后仍然匹配 [re]。由于 [s2] 必须为非空字符串，
@@ -1775,8 +1974,134 @@ Proof.
        | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2 ].
   - (* MEmpty *)
     simpl. intros contra. inversion contra.
-  (* 请在此处解答 *) Admitted.
-(** [] *)
+  - (* Mchar*)
+    simpl. intros contra. inversion contra. inversion H0.
+  - (* MApp *)
+    simpl. intros H.
+    rewrite app_length in H.
+    destruct (pumping_constant re1 <=? length s1) eqn:Hle1.
+     + (* pumping_constant re1 <= length s1 *)
+      apply leb_complete in Hle1.
+      apply IH1 in Hle1.
+      destruct Hle1 as [s11 [s12 [s13 [Heq1 [Hneq1 Hpump1]]]]].
+      exists s11, s12, (s13 ++ s2).
+      split.
+      * rewrite Heq1. rewrite <- app_assoc. rewrite <- app_assoc. reflexivity.
+      * split.
+        -- apply Hneq1.
+        -- intros m. rewrite app_assoc. rewrite app_assoc.
+           apply MApp.
+           ++ rewrite <- app_assoc. apply Hpump1.
+           ++ apply Hmatch2.
+      + (* pumping_constant re1 > length s1 *)
+      apply leb_complete_conv in Hle1.
+      assert (Hle2: pumping_constant re2 <= length s2).
+      { 
+        destruct (pumping_constant re2 <=? length s2) eqn:Hle2.
+        - apply leb_complete. apply Hle2.
+        - (* 假设 pumping_constant re2 > length s2，推出矛盾 *)
+          apply leb_complete_conv in Hle2.
+          exfalso.
+          (* 我们有：
+            length s1 <= pumping_constant re1
+            length s2 <= pumping_constant re2
+            pumping_constant re1 + pumping_constant re2 <= length s1 + length s2
+            这是矛盾的 *)
+          assert (Hcontra: length s1 + length s2 <= pumping_constant re1 + pumping_constant re2).
+          {
+            apply plus_le_compat.
+            - apply ltb_lt in Hle1. exact Hle1.
+            - apply ltb_lt in Hle2. apply Hle2.
+          }
+          apply le_not_lt with (n := pumping_constant re1 + pumping_constant re2) 
+                              (m := length s1 + length s2).
+          ++ apply H.
+          ++ apply plus_lt_compat.
+            * exact Hle1.
+            * exact Hle2.
+      }
+      apply IH2 in Hle2.
+      destruct Hle2 as [s21 [s22 [s23 [Heq2 [Hneq2 Hpump2]]]]].
+      exists (s1 ++ s21), s22, s23.
+      split.
+      * rewrite Heq2. rewrite <- app_assoc. reflexivity.
+      * split.
+        -- apply Hneq2.
+        -- intros m. rewrite <- app_assoc. apply MApp.
+           ++ apply Hmatch1.
+           ++ apply Hpump2.
+  - (* MUnionL *)
+    simpl. intros H.
+    assert (H1: pumping_constant re1 <= length s1).
+    { apply (le_trans _ (max (pumping_constant re1) (pumping_constant re2)) _).
+      - apply le_max_l.
+      - apply plus_le in H.
+        destruct H as [H1 H2].
+        destruct (pumping_constant re1 <=? pumping_constant re2) eqn:Hcmp.
+        --- apply max_lub.
+          ** exact H1. 
+          ** exact H2.
+        --- apply max_lub.
+          ** exact H1.
+          ** exact H2.
+    }
+    apply IH in H1.
+    destruct H1 as [s11 [s12 [s13 [Heq [Hneq Hpump]]]]].
+    exists s11, s12, s13.
+    split. apply Heq. split. apply Hneq.
+    intros m. apply MUnionL. apply Hpump.
+  - (* MUnionR *)
+    simpl. intros H.
+    assert (H2: pumping_constant re2 <= length s2).
+    { apply (le_trans _ (max (pumping_constant re1) (pumping_constant re2)) _).
+      - apply le_max_r.
+      - apply plus_le in H.
+        destruct H as [H1 H2].
+        destruct (pumping_constant re1 <=? pumping_constant re2) eqn:Hcmp.
+        --- apply max_lub.
+          ** exact H1. 
+          ** exact H2.
+        --- apply max_lub.
+          ** exact H1.
+          ** exact H2.
+    }
+    apply IH in H2.
+    destruct H2 as [s21 [s22 [s23 [Heq [Hneq Hpump]]]]].
+    exists s21, s22, s23.
+    split. apply Heq. split. apply Hneq.
+    intros m. apply MUnionR. apply Hpump.
+  - (* MStar0 *)
+    simpl. intros H. inversion H.
+    apply pumping_constant_0_false in H1.
+    exfalso. exact H1.
+  - (* MStarApp *)
+    simpl. intros H.
+    destruct s1.
+    + (* s1 = [] *)
+      simpl in *. apply IH2 in H.
+      destruct H as [s21 [s22 [s23 [Heq [Hneq Hpump]]]]].
+      exists s21, s22, s23.
+      split. apply Heq. split. apply Hneq.
+      intros m. apply Hpump.
+    + (* s1 = x :: s1 *)
+      exists [], (x :: s1), s2.
+      split. reflexivity.
+      split. intros contra. inversion contra.
+      intros m. simpl.
+      induction m.
+      * simpl. apply Hmatch2.
+      * simpl. 
+        assert (Heq: x :: (s1 ++ napp m (x :: s1)) ++ s2 = 
+             (x :: s1) ++ napp m (x :: s1) ++ s2).
+        { simpl. rewrite <- app_assoc.
+          simpl.
+          rewrite app_assoc.
+          reflexivity. }
+        rewrite Heq. apply MStarApp.
+        -- apply Hmatch1.
+        -- apply IHm.
+Qed.
+
 
 (** **** 练习：5 星, advanced, optional (pumping) 
 
