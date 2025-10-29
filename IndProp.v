@@ -2369,7 +2369,21 @@ Qed.
 (** **** 练习：2 星, standard, recommended (reflect_iff)  *)
 Theorem reflect_iff : forall P b, reflect P b -> (P <-> b = true).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros P b H. destruct b.
+  - split. 
+    + intros. reflexivity.
+    + intros. 
+      inversion H.
+      exact H1.
+  - split.
+    + intros.
+      inversion H.
+      unfold not in H1.
+      apply H1 in H0.
+      exfalso. exact H0.
+    + intros.
+      discriminate.
+Qed. 
 (** [] *)
 
 (** 使用 [reflect] 而非“当且仅当”连词的好处是，通过解构一个形如
@@ -2416,7 +2430,26 @@ Fixpoint count n l :=
 Theorem eqbP_practice : forall n l,
   count n l = 0 -> ~(In n l).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n l.
+  induction l as [| h l' IHl'].
+  + simpl. unfold not. intros. exact H0.
+  + simpl. destruct (eqbP n h) as [H | H].
+    - simpl. 
+      intros Hcontra.
+      inversion Hcontra.
+    - simpl.
+      intros H0.
+      apply IHl' in H0.
+      unfold not.
+      intros H1.
+      destruct H1 as [H2 | H3].
+      * unfold not in H. 
+        symmetry in H2.
+        apply H in H2.
+        exact H2.
+      * apply H0 in H3.
+        exact H3.
+Qed.
 (** [] *)
 
 (** 这个小例子展示了互映证明可以怎样为我们提供一些便利。在大型的开发中，
@@ -2442,42 +2475,33 @@ Proof.
     请写出 [nostutter] 的归纳定义。 *)
 
 Inductive nostutter {X:Type} : list X -> Prop :=
- (* 请在此处解答 *)
-.
+  | ns_nil : nostutter []
+  | ns_one : forall (x:X), nostutter [x]
+  | ns_cons : forall (x y:X) (l:list X),
+    x <> y -> nostutter (y :: l) -> nostutter (x :: y :: l).
 (** 请确保以下测试成功，但如果你觉得我们建议的证明（在注释中）并不有效，也可随意更改他们。
     若你的定义与我们的不同，也可能仍然是正确的，但在这种情况下可能需要不同的证明。
     （你会注意到建议的证明中使用了一些我们尚未讨论过的策略，这可以让证明适用于不同的 [nostutter]
     定义方式。你可以取消注释并直接使用他们，也可以用基础的策略证明这些例子。） *)
 
 Example test_nostutter_1: nostutter [3;1;4;1;5;6].
-(* 请在此处解答 *) Admitted.
-(* 
   Proof. repeat constructor; apply eqb_neq; auto.
   Qed.
-*)
 
 Example test_nostutter_2:  nostutter (@nil nat).
-(* 请在此处解答 *) Admitted.
-(* 
   Proof. repeat constructor; apply eqb_neq; auto.
   Qed.
-*)
 
 Example test_nostutter_3:  nostutter [5].
-(* 请在此处解答 *) Admitted.
-(* 
   Proof. repeat constructor; apply eqb_false; auto. Qed.
-*)
 
-Example test_nostutter_4:      not (nostutter [3;1;1;4]).
-(* 请在此处解答 *) Admitted.
-(* 
+Example test_nostutter_4:      not (nostutter [3;1;1;4]). 
   Proof. intro.
   repeat match goal with
     h: nostutter _ |- _ => inversion h; clear h; subst
   end.
   contradiction; auto. Qed.
-*)
+
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_nostutter : option (nat*string) := None.
@@ -2605,14 +2629,77 @@ Lemma in_split : forall (X:Type) (x:X) (l:list X),
   In x l ->
   exists l1 l2, l = l1 ++ x :: l2.
 Proof.
-  (* 请在此处解答 *) Admitted.
-
+  intros X x l H.
+  induction l as [| h l' IHl'].
+  + inversion H.
+  + (* l = h :: l' *)
+    simpl in H.
+    destruct H as [H | H].
+    - (* h = x *)
+      exists [], l'.
+      simpl.
+      rewrite H.
+      reflexivity.
+    - (* In x l' *)
+      apply IHl' in H.
+      destruct H as [l1 [l2 Heq]].
+      exists (h :: l1), l2.
+      simpl.
+      rewrite Heq.
+      reflexivity.
+Qed.
+    
 (** 现在请定一个性质 [repeats]，使 [repeats X l] 断言 [l]
     包含至少一个（类型为 [X] 的）重复的元素。*)
 
 Inductive repeats {X:Type} : list X -> Prop :=
-  (* 请在此处解答 *)
-.
+  | rep_here : forall (x:X) (l:list X),
+      In x l -> repeats (x :: l)
+  | rep_later : forall (x:X) (l:list X),
+      repeats l -> repeats (x :: l).
+
+Lemma in_app_or : forall {X:Type} (l m:list X) (a:X), In a (l ++ m) -> In a l \/ In a m.
+  Proof.
+    intros X l m a.
+    elim l; simpl in |- *; auto.
+    intros a0 y H H0.
+    now_show ((a0 = a \/ In a y) \/ In a m).
+    elim H0; auto.
+    intro H1.
+    now_show ((a0 = a \/ In a y) \/ In a m).
+    elim (H H1); auto.
+Qed.
+
+Lemma in_or_app : forall {X:Type}(l m:list X) (a:X), In a l \/ In a m -> In a (l ++ m).
+  Proof.
+    intros X l m a.
+    elim l; simpl in |- *; intro H.
+    now_show (In a m).
+    elim H; auto; intro H0.
+    now_show (In a m).
+    elim H0.
+    intros y H0 H1.
+    now_show (H = a \/ In a (y ++ m)).
+    elim H1; auto 4.
+    intro H2.
+    now_show (H = a \/ In a (y ++ m)).
+    elim H2; auto.
+Qed.
+
+Theorem lt_S_n : forall n m, S n < S m -> n < m.
+Proof.
+  intros n m H.
+  inversion H.
+  - unfold lt.
+    reflexivity.
+  - unfold lt.
+    apply le_trans with (n:=S(S n)).
+    + unfold lt.
+      apply le_S.
+      apply le_n.
+    + exact H1.
+Qed.
+  
 
 (** 现在，我们这样来形式化鸽笼原理。假设列表 [l2] 表示鸽笼标签的列表，列表 [l1]
     表示标签被指定给一个列表里的元素。如果元素的个数多于标签的个数，那么至少有两个
@@ -2629,8 +2716,53 @@ Theorem pigeonhole_principle: forall (X:Type) (l1  l2:list X),
    length l2 < length l1 ->
    repeats l1.
 Proof.
-   intros X l1. induction l1 as [|x l1' IHl1'].
-  (* 请在此处解答 *) Admitted.
+  intros X l1. induction l1 as [|x l1' IHl1'].
+    + intros. 
+      inversion H1.
+    + intros.
+      destruct (H (In x l1')) as [Hin | Hnin].
+      - (* In x l1' - x 在 l1' 中重复出现 *)
+        apply rep_here.
+        apply Hin.
+      - (* ~ In x l1' - x 不在 l1' 中 *)
+        apply rep_later.
+        (* 我们需要证明 repeats l1' *)
+        (* 由于 x 不在 l1' 中，但 x 在 l2 中，我们可以从 l2 中"移除" x *)
+        assert (Hin_x_l2: In x l2).
+        { apply H0. simpl. left. reflexivity. }
+        (* 使用 in_split 将 l2 分解 *)
+        apply in_split in Hin_x_l2.
+        destruct Hin_x_l2 as [l2a [l2b Heq_l2]].
+        (* 现在 l2 = l2a ++ x :: l2b *)
+        (* l1' 的所有元素都在 l2a ++ l2b 中 *)
+        apply IHl1' with (l2 := l2a ++ l2b).
+        ++ apply H.
+        ++ intros x0 Hx0.
+          (* x0 在 l1' 中，所以 x0 在 l2 中 *)
+          assert (Hin_x0: In x0 l2).
+          { apply H0. simpl. right. apply Hx0. }
+          (* x0 在 l2 = l2a ++ x :: l2b 中 *)
+          rewrite Heq_l2 in Hin_x0.
+          apply in_app_or in Hin_x0.
+          destruct Hin_x0 as [Hin_a | Hin_b].
+          * apply in_or_app. left. apply Hin_a.
+          * simpl in Hin_b.
+            destruct Hin_b as [Heq | Hin_b'].
+            -- (* x0 = x，但这与 x 不在 l1' 中矛盾 *)
+              exfalso.
+              rewrite <- Heq in Hx0.
+              contradiction.
+            -- apply in_or_app. right. apply Hin_b'.
+        ++ (* length (l2a ++ l2b) < length l1' *)
+          rewrite app_length.
+          rewrite Heq_l2 in H1.
+          simpl in H1.
+          rewrite app_length in H1.
+          simpl in H1.
+          rewrite <- plus_n_Sm in H1.
+          apply lt_S_n in H1.
+          apply H1.
+      Qed.
 
 (* GRADE_MANUAL 1.5: check_repeats
 
