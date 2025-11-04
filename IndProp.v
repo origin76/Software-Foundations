@@ -202,7 +202,7 @@ Theorem evSS_ev : forall n,
   ev (S (S n)) -> even n.
 (** 直观来说，我们知道支撑前提的证据不会由 [ev_0] 组成，因为 [0] 和 [S] 是
     [nat] 类型不同的构造子；由此 [ev_SS] 是唯一需要应对的情况（译注：[ev_0] 无条件成立）。
-    不幸的是，[destruct] 并没有如此智能，它仍然为我们生成两个子目标。
+Stdlib 不幸的是，[destruct] 并没有如此智能，它仍然为我们生成两个子目标。
     更坏的是，于此同时最终目标没有改变，也无法为完成证明提供任何有用的信息。 *)
 
 Proof.
@@ -2786,6 +2786,46 @@ Proof.
 
 (** 我们将要实现的正则表达式匹配器会匹配由 ASCII 字符构成的列表：*)
 Require Import Coq.Strings.Ascii.
+Require Import Coq.Arith.Arith.
+
+(* 使用标准库的判定 *)
+Definition eqb_ascii (a b : ascii) : bool :=
+  if ascii_dec a b then true else false.
+
+Notation "x =? y" := (eqb_ascii x y) (at level 70) : char_scope.
+Open Scope char_scope.
+
+Lemma eqb_ascii_refl : forall a : ascii, (a =? a) = true.
+Proof.
+  intros. unfold eqb_ascii.
+  destruct (ascii_dec a a).
+  - reflexivity.
+  - contradiction.
+Qed.
+
+Lemma eqb_ascii_eq : forall a b : ascii,
+  (a =? b) = true <-> a = b.
+Proof.
+  intros. unfold eqb_ascii. split.
+  - intros. destruct (ascii_dec a b).
+    + assumption.
+    + discriminate.
+  - intros. subst. destruct (ascii_dec b b).
+    + reflexivity.
+    + contradiction.
+Qed.
+
+Lemma eqb_ascii_neq : forall a b : ascii,
+  (a =? b) = false <-> a <> b.
+Proof.
+  intros. unfold eqb_ascii. split.
+  - intros. destruct (ascii_dec a b).
+    + discriminate.
+    + assumption.
+  - intros. destruct (ascii_dec a b).
+    + contradiction.
+    + reflexivity.
+Qed.
 
 Definition string := list ascii.
 
@@ -2891,7 +2931,43 @@ Lemma app_ne : forall (a : ascii) s re0 re1,
     ([ ] =~ re0 /\ a :: s =~ re1) \/
     exists s0 s1, s = s0 ++ s1 /\ a :: s0 =~ re0 /\ s1 =~ re1.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  split.
+  + (* -> 方向 *)
+    intros H.
+    inversion H as [| | s1 s2 re0' re1' H1 H2 | | | |]. subst.
+    destruct s1 as [| b s1'].
+    - (* s1 = [] *)
+      left.
+      split.
+      * exact H1.
+      * simpl in H0. simpl. exact H2.
+    - (* s1 = b :: s1' *)
+      right.
+      injection H0 as Ha Hs.
+      intros.
+      exists s1', re0'.
+      split.
+      * symmetry.
+        exact Hs.
+      * split.
+        -- rewrite <- Ha. exact H1.
+        -- exact H2.
+  + (* <- 方向 *)
+    intros [[H1 H2] | [s0 [s1 [Hs [H1 H2]]]]].
+    - (* 左分支: [] =~ re0 /\ a :: s =~ re1 *)
+      replace (a :: s) with ([] ++ a :: s).
+      * apply MApp.
+        -- exact H1.
+        -- exact H2.
+      * simpl. reflexivity.
+    - (* 右分支: exists s0 s1, ... *)
+      subst.
+      replace (a :: s0 ++ s1) with ((a :: s0) ++ s1).
+      * apply MApp.
+        -- exact H1.
+        -- exact H2.
+      * simpl. reflexivity.
+Qed.
 (** [] *)
 
 (** [s] 匹配 [Union re0 re1] 当且仅当 [s] 匹配 [re0] 或 [s] 匹配 [re1]. *)
@@ -2924,7 +3000,32 @@ Lemma star_ne : forall (a : ascii) s re,
     a :: s =~ Star re <->
     exists s0 s1, s = s0 ++ s1 /\ a :: s0 =~ re /\ s1 =~ Star re.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros a s re. split.
+  - (* -> 方向：从 a :: s =~ Star re 推出存在分解 *)
+    intros H.
+    (* 关键：使用 remember 来泛化归纳假设 *)
+    remember (a :: s) as s'.
+    remember (Star re) as re'.
+    induction H; try discriminate.
+    + (* MStarApp 情况 *)
+      (* 首先处理 re' = Star re0 *)
+      injection Heqre' as Heqre0.
+      subst re0.
+      destruct s1 as [| a' s0] eqn:Es1.
+      * (* s1 = [] *)
+        simpl in Heqs'. subst s2.
+        apply IHexp_match2; reflexivity.
+      * (* s1 = a' :: s0 *)
+        injection Heqs' as Ha Hs0s2.
+        subst a' s.
+        exists s0, s2.
+        split; [reflexivity | split; assumption].
+  - (* <- 方向：从分解构造匹配 *)
+    intros [s0 [s1 [Hs [H1 H2]]]].
+    subst s.
+    (* 使用 MStarApp 构造器 *)
+    apply (MStarApp (a :: s0) s1 re H1 H2).
+Qed.
 (** [] *)
 
 (** 我们的正则表达式匹配器定义包括两个不动点函数。第一个函数对给定的正则表达式 [re]
@@ -2935,9 +3036,24 @@ Definition refl_matches_eps m :=
 (** **** 练习：2 星, standard, optional (match_eps) 
 
     完成 [match_eps] 的定义，其测试给定的正则表达式是否匹配空字符串： *)
-Fixpoint match_eps (re: reg_exp ascii) : bool
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint match_eps (re: reg_exp ascii) : bool := 
+   match re with
+  | EmptySet => false
+  | EmptyStr => true
+  | Char _ => false
+  | App re1 re2 => match_eps re1 && match_eps re2
+  | Union re1 re2 => match_eps re1 || match_eps re2
+  | Star _ => true
+  end.
 (** [] *)
+
+Theorem app_eq_nil : forall {X : Type} (l l':list X),
+ l ++ l' = nil -> l = nil /\ l' = nil.
+  Proof.
+    destruct l as [| x l]; destruct l' as [| y l']; simpl in |- *; auto.
+    intro; discriminate.
+    intros H; discriminate H.
+  Qed.
 
 (** **** 练习：3 星, standard, optional (match_eps_refl) 
 
@@ -2945,7 +3061,54 @@ Fixpoint match_eps (re: reg_exp ascii) : bool
     （提示：你会使用到互映引理 [ReflectT] 和 [ReflectF]。） *)
 Lemma match_eps_refl : refl_matches_eps match_eps.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  unfold refl_matches_eps.
+  intros re.
+  (* 对 re 进行归纳 *)
+  induction re.
+  - (* EmptySet *)
+    simpl. apply ReflectF.
+    intros H. inversion H.
+  - (* EmptyStr *)
+    simpl. apply ReflectT.
+    apply MEmpty.
+  - (* Char t *)
+    simpl. apply ReflectF.
+    intros H. inversion H.
+  - (* App re1 re2 *)
+    simpl. 
+    destruct IHre1 as [H1 | H1]; destruct IHre2 as [H2 | H2].
+    + (* 两个都匹配空串 *)
+      apply ReflectT.
+      apply (MApp [] re1 [] re2 H1 H2).
+    + (* re1 匹配但 re2 不匹配 *)
+      apply ReflectF.
+      intros H. inversion H. subst.
+      (* s1 ++ s2 = [] 意味着 s1 = [] 且 s2 = [] *)
+      apply app_eq_nil in H0. destruct H0. subst.
+      contradiction.
+    + (* re1 不匹配但 re2 匹配 *)
+      apply ReflectF.
+      intros H. inversion H. subst.
+      apply app_eq_nil in H0. destruct H0. subst.
+      contradiction.
+    + (* 两个都不匹配 *)
+      apply ReflectF.
+      intros H. inversion H. subst.
+      apply app_eq_nil in H0. destruct H0. subst.
+      contradiction.
+  - (* Union re1 re2 *)
+    simpl.
+    destruct IHre1 as [H1 | H1]; destruct IHre2 as [H2 | H2].
+    + apply ReflectT. apply MUnionL. apply H1.
+    + apply ReflectT. apply MUnionL. apply H1.
+    + apply ReflectT. apply MUnionR. apply H2.
+    + apply ReflectF.
+      intros H. inversion H; contradiction.
+  - (* Star re *)
+    simpl.
+    apply ReflectT.
+    apply MStar0.
+Qed.
 (** [] *)
 
 (** 我们将会定义其他函数也使用到 [match_eps]。然而，这些函数的证明中你唯一会用到的
@@ -2967,8 +3130,18 @@ Definition derives d := forall a re, is_der re a (d a re).
 
     请定义 [derive] 使其生成字符串。一个自然的实现是在某些分类使用
     [match_eps] 来判断正则表达式是否匹配空字符串。 *)
-Fixpoint derive (a : ascii) (re : reg_exp ascii) : reg_exp ascii
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint derive (a : ascii) (re : reg_exp ascii) : reg_exp ascii :=
+  match re with
+  | EmptySet => EmptySet
+  | EmptyStr => EmptySet
+  | Char c => if (c =? a) then EmptyStr else EmptySet
+  | App re1 re2 => 
+      if match_eps re1 
+      then Union (App (derive a re1) re2) (derive a re2)
+      else App (derive a re1) re2
+  | Union re1 re2 => Union (derive a re1) (derive a re2)
+  | Star re => App (derive a re) (Star re)
+  end.
 (** [] *)
 
 (** [derive] 函数应当通过以下测试。每个测试都在将被匹配器所求值的表达式和
@@ -2980,44 +3153,44 @@ Example d := ascii_of_nat 100.
 (** "c" =~ EmptySet: *)
 Example test_der0 : match_eps (derive c (EmptySet)) = false.
 Proof.
-  (* 请在此处解答 *) Admitted.
+reflexivity. Qed.
 
 (** "c" =~ Char c: *)
 Example test_der1 : match_eps (derive c (Char c)) = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+reflexivity. Qed.
 
 (** "c" =~ Char d: *)
 Example test_der2 : match_eps (derive c (Char d)) = false.
 Proof.
-  (* 请在此处解答 *) Admitted.
+reflexivity. Qed.
 
 (** "c" =~ App (Char c) EmptyStr: *)
 Example test_der3 : match_eps (derive c (App (Char c) EmptyStr)) = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+reflexivity. Qed.
 
 (** "c" =~ App EmptyStr (Char c): *)
 Example test_der4 : match_eps (derive c (App EmptyStr (Char c))) = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+reflexivity. Qed.
 
 (** "c" =~ Star c: *)
 Example test_der5 : match_eps (derive c (Star (Char c))) = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+reflexivity. Qed.
 
 (** "cd" =~ App (Char c) (Char d): *)
 Example test_der6 :
   match_eps (derive d (derive c (App (Char c) (Char d)))) = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+reflexivity. Qed.
 
 (** "cd" =~ App (Char d) (Char c): *)
 Example test_der7 :
   match_eps (derive d (derive c (App (Char d) (Char c)))) = false.
 Proof.
-  (* 请在此处解答 *) Admitted.
+reflexivity. Qed.
 
 (** **** 练习：4 星, standard, optional (derive_corr) 
 
@@ -3037,7 +3210,115 @@ Proof.
     你可以使用 [intro] 和 [destruct] 来对这些命题进行推理。*)
 Lemma derive_corr : derives derive.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  unfold derives.
+  unfold is_der.
+  intros a re.
+  induction re.
+  
+  + (* EmptySet *)
+    simpl. split.
+    - intros H. inversion H.
+    - intros H. inversion H.
+    
+  + (* EmptyStr *)
+    simpl. split.
+    - intros H. inversion H.
+    - intros H. inversion H.
+    
+  + (* Char t *)
+    simpl. split.
+    - intros H. inversion H.
+      destruct (t =? a)  eqn:Eq.
+      * rewrite H3 in Eq.
+        rewrite Eq.
+        apply MEmpty.
+      * apply eqb_ascii_neq in Eq.
+        symmetry in H3.
+        contradiction.
+    - intros H. 
+      destruct (t =? a) eqn:Eq.
+      * apply eqb_ascii_eq in Eq. 
+        inversion H. subst. apply MChar.
+      * inversion H.
+      
+  + (* App re1 re2 *)
+    simpl. split.
+    - intros H. inversion H. subst.
+      (* s1 ++ s2 = a :: s，需要分情况 *)
+      destruct s1 as [| a' s1'] eqn:Es1.
+      * (* s1 = [] *)
+        simpl in H1. subst.
+        (* 所以 a :: s0 =~ re2 *)
+        destruct (match_eps re1) eqn:Em.
+        -- apply MUnionR. apply IHre2. apply H4.
+        -- exfalso.
+          assert (R := match_eps_refl re1).
+          rewrite Em in R.
+          inversion R.
+          contradiction.
+      * (* s1 = a' :: s1' *)
+        injection H1 as Ha Hs1's2.
+        subst a'.
+        (* 现在 H3: a :: s1' =~ re1, H4: s2 =~ re2 *)
+        destruct (match_eps re1) eqn:Em.
+        -- apply MUnionL. 
+           rewrite <- Hs1's2.
+           apply MApp with (s1:=s1') (s2:=s2).
+           ++ apply IHre1. apply H3.
+           ++ apply H4.
+        -- rewrite <- Hs1's2.
+           apply MApp with (s1:=s1') (s2:=s2).
+           ++ apply IHre1. apply H3.
+           ++ apply H4.
+           
+    - intros H.
+      destruct (match_eps re1) eqn:Em.
+      * (* re1 匹配空串 *)
+        inversion H; subst.
+        -- (* Union 左边：App (derive a re1) re2 *)
+           inversion H2; subst.
+           apply MApp with (s1:=a::s1) (s2:=s2).
+           ++ apply IHre1. apply H4.
+           ++ apply H5.
+        -- (* Union 右边：derive a re2 *)
+           apply MApp with (s1:=[]) (s2:=a::s).
+           ++ assert (R := match_eps_refl re1).
+              rewrite Em in R.
+              inversion R.
+              exact H0.
+           ++ apply IHre2. apply H1.
+      * (* re1 不匹配空串 *)
+        inversion H; subst.
+        apply MApp with (s1:=a::s1) (s2:=s2).
+        -- apply IHre1. apply H3.
+        -- apply H4.
+        
+  + (* Union re1 re2 *)
+    simpl. split.
+    - intros H. inversion H; subst.
+      * apply MUnionL. apply IHre1. apply H2.
+      * apply MUnionR. apply IHre2. apply H1.
+    - intros H. inversion H; subst.
+      * apply MUnionL. apply IHre1. apply H2.
+      * apply MUnionR. apply IHre2. apply H1.
+      
+  + (* Star re *)
+    simpl. split.
+    - intros H.
+      (* 使用 star_ne 引理 *)
+      apply star_ne in H.
+      destruct H as [s0 [s1 [Hs [H1 H2]]]].
+      subst s.
+      apply MApp with (s1:=s0) (s2:=s1).
+      * apply IHre. apply H1.
+      * apply H2.
+    - intros H.
+      inversion H; subst.
+      apply MStarApp with (s1:=a::s1) (s2:=s2).
+      * apply IHre. apply H3.
+      * apply H4.
+Qed.
+  
 (** [] *)
 
 (** 我们将会使用 [derive] 来定义正则表达式匹配器。然而，在匹配器的性质的证明中你唯一会用到
@@ -3051,8 +3332,11 @@ Definition matches_regex m : Prop :=
 (** **** 练习：2 星, standard, optional (regex_match) 
 
     完成 [regex_match] 的定义，使其可以匹配正则表达式。*)
-Fixpoint regex_match (s : string) (re : reg_exp ascii) : bool
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint regex_match (s : string) (re : reg_exp ascii) : bool :=
+  match s with
+  | [] => match_eps re
+  | a :: s' => regex_match s' (derive a re)
+  end.
 (** [] *)
 
 (** **** 练习：3 星, standard, optional (regex_refl) 
@@ -3066,9 +3350,27 @@ Fixpoint regex_match (s : string) (re : reg_exp ascii) : bool
     提示：如果你定义的 [regex_match] 对字符 [x] 和正则表达式 [re] 使用了 [derive]，
     那么可对 [x] 和 [re] 应用 [derive_corr]，以此证明 [x :: s =~ re] 当给定
     [s =~ derive x re] 时，反之亦然。 *)
-Theorem regex_refl : matches_regex regex_match.
+Theorem regex_match_correct : matches_regex regex_match.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  unfold matches_regex.
+  intros s re.
+  generalize dependent re.
+  induction s as [| a s' IH].
+  - (* s = [] *)
+    intros re. simpl.
+    apply match_eps_refl.
+  - (* s = a :: s' *)
+    intros re. simpl.
+    specialize (IH (derive a re)).
+    (* 需要使用 derive_corr *)
+    assert (H := derive_corr a re).
+    unfold is_der in H.
+    destruct IH as [H1 | H1]; destruct (regex_match s' (derive a re)) eqn:E.
+    + apply ReflectT. apply H. apply H1.
+    + apply ReflectT. apply H. apply H1.
+    + apply ReflectF. intros Contra. apply H in Contra. contradiction.
+    + apply ReflectF. intros Contra. apply H in Contra. contradiction.
+Qed.
 (** [] *)
 
 (* 2022-03-14 05:26:57 (UTC+00) *)
