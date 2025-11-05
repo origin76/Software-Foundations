@@ -20,11 +20,11 @@
     因为我们一直小心地将自己的定义和定理的命名与标准库中的部分保持一致，
     无论它们在哪里重复。 *)
 
-From Coq Require Import Arith.Arith.
-From Coq Require Import Bool.Bool.
-Require Export Coq.Strings.String.
-From Coq Require Import Logic.FunctionalExtensionality.
-From Coq Require Import Lists.List.
+From Stdlib Require Import Arith.Arith.
+From Stdlib Require Import Bool.Bool.
+Require Export Stdlib.Strings.String.
+From Stdlib Require Import Logic.FunctionalExtensionality.
+From Stdlib Require Import Lists.List.
 Import ListNotations.
 
 (** 标准库的文档见
@@ -186,7 +186,10 @@ Proof. reflexivity. Qed.
 Lemma t_apply_empty : forall (A : Type) (x : string) (v : A),
     (_ !-> v) x = v.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros A x v.
+  unfold t_empty.
+  reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard, optional (t_update_eq) 
@@ -198,7 +201,11 @@ Proof.
 Lemma t_update_eq : forall (A : Type) (m : total_map A) x v,
     (x !-> v ; m) x = v.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros A m x v.
+  unfold t_update.
+  rewrite <- eqb_string_refl.
+  reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard, optional (t_update_neq) 
@@ -211,7 +218,12 @@ Theorem t_update_neq : forall (A : Type) (m : total_map A) x1 x2 v,
     x1 <> x2 ->
     (x1 !-> v ; m) x2 = m x2.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros A m x1 x2 v H.
+  unfold t_update.
+  apply eqb_string_false_iff in H.
+  rewrite H.
+  reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard, optional (t_update_shadow) 
@@ -223,7 +235,16 @@ Proof.
 Lemma t_update_shadow : forall (A : Type) (m : total_map A) x v1 v2,
     (x !-> v2 ; x !-> v1 ; m) = (x !-> v2 ; m).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros A m x v1 v2.
+  unfold t_update.
+  apply functional_extensionality.
+  intros x'.
+  destruct (eqb_string x x') eqn:E.
+  - (* eqb_string x x' = true *)
+    simpl. reflexivity.
+  - (* eqb_string x x' = false *)
+    simpl. reflexivity.
+Qed.
 (** [] *)
 
 (** 对于最后两个全映射的引理而言，用 [IndProp] 一章中引入的互映法
@@ -237,7 +258,18 @@ Proof.
 Lemma eqb_stringP : forall x y : string,
     reflect (x = y) (eqb_string x y).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros x y.
+  destruct (eqb_string x y) eqn:E.
+  - (* eqb_string x y = true *)
+    apply ReflectT.
+    apply eqb_string_true_iff.
+    apply E.
+  - (* eqb_string x y = false *)
+    apply ReflectF.
+    apply eqb_string_false_iff.
+    apply E.
+Qed.
+  
 (** [] *)
 
 (** 现在，给定 [string] 类型的字符串 [x1] 和 [x2]，我们可以在使用策略
@@ -254,8 +286,27 @@ Proof.
 Theorem t_update_same : forall (A : Type) (m : total_map A) x,
     (x !-> m x ; m) = m.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros A m x.
+  unfold t_update.
+  apply functional_extensionality.
+  intros x0.
+  destruct (eqb_stringP x x0).
+  + rewrite e.
+    reflexivity.
+  + reflexivity.
+Qed.
 (** [] *)
+
+Lemma eqb_string_sym : forall x y,
+    eqb_string x y = eqb_string y x.
+Proof.
+  intros.
+  destruct (eqb_stringP x y), (eqb_stringP y x).
+  - reflexivity.
+  - exfalso. apply n. symmetry. apply e.
+  - exfalso. apply n. symmetry. apply e.
+  - reflexivity.
+Qed.
 
 (** **** 练习：3 星, standard, recommended (t_update_permute) 
 
@@ -269,7 +320,36 @@ Theorem t_update_permute : forall (A : Type) (m : total_map A)
     =
     (x2 !-> v2 ; x1 !-> v1 ; m).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros A m v1 v2 x1 x2 H.
+  unfold t_update.
+  apply functional_extensionality.
+  intros x.
+  destruct (eqb_stringP x x1);
+  destruct (eqb_stringP x x2).
+  - (* x = x1, x = x2 *) 
+  exfalso. apply H. rewrite <- e. symmetry. exact e0.
+  - (* x = x1, x <> x2 *)
+    rewrite e.
+    rewrite <- eqb_string_refl.
+    apply eqb_string_false_iff in H.
+    rewrite H.
+    reflexivity.
+  - (* x <> x1, x = x2 *)
+    rewrite e.
+    rewrite <- eqb_string_refl.
+    apply eqb_string_false_iff in H.
+    rewrite eqb_string_sym in H.
+    rewrite H.
+    reflexivity.
+  - (* x <> x1, x <> x2 *)
+    apply false_eqb_string in n.
+    apply false_eqb_string in n0.
+    rewrite eqb_string_sym in n.
+    rewrite eqb_string_sym in n0.
+    rewrite n0.
+    rewrite n.
+    reflexivity.
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -347,3 +427,4 @@ Proof.
 Qed.
 
 (* 2022-03-14 05:26:57 (UTC+00) *)
+(* finish by zerick 2025-11-05 16:41:00 (UTC+8)*)
