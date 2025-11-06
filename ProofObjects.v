@@ -142,10 +142,11 @@ Print ev_4'''.
 
 Theorem ev_8 : ev 8.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply (ev_SS 6(ev_SS 4(ev_SS 2 (ev_SS 0 ev_0)))).
+Qed.
 
-Definition ev_8' : ev 8
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition ev_8' : ev 8 :=
+  ev_SS 6(ev_SS 4(ev_SS 2 (ev_SS 0 ev_0))).
 (** [] *)
 
 (* ################################################################# *)
@@ -328,7 +329,12 @@ Definition and_comm' P Q : P /\ Q <-> Q /\ P :=
     构造一个证明对象来证明下列命题。 *)
 
 Definition conj_fact : forall P Q R, P /\ Q -> Q /\ R -> P /\ R
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+   := fun P Q R HPQ HQR => 
+       match HPQ with
+       | conj HP _ => match HQR with
+                      | conj _ HR => conj HP HR
+                      end
+       end.
 (** [] *)
 
 (* ================================================================= *)
@@ -355,7 +361,11 @@ End Or.
     定义的版本！） *)
 
 Definition or_comm : forall P Q, P \/ Q -> Q \/ P
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+  := fun P Q HPQ => 
+       match HPQ with
+       | or_introl HP => or_intror HP
+       | or_intror HQ => or_introl HQ
+       end.
 (** [] *)
 
 (* ================================================================= *)
@@ -388,8 +398,11 @@ Definition some_nat_is_even : exists n, ev n :=
 
     完成下列证明对象的定义： *)
 
-Definition ex_ev_Sn : ex (fun n => ev (S n))
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition ex_ev_Sn : ex (fun n => ev (S n)) :=
+   ex_intro 
+    (fun n => ev (S n))  (* 谓词 P *)
+    1                     (* 见证者：n = 1 *)
+    (ev_SS 0 ev_0).        (* 证明：ev (S 1) = ev 2 *)
 (** [] *)
 
 (* ================================================================= *)
@@ -473,7 +486,12 @@ Definition singleton : forall (X:Type) (x:X), []++[x] == x::[]  :=
 Lemma equality__leibniz_equality : forall (X : Type) (x y: X),
   x == y -> forall P:X->Prop, P x -> P y.
 Proof.
-(* 请在此处解答 *) Admitted.
+  intros X x y H P.
+  inversion H.
+  intros.
+  exact H2.
+Qed.
+  
 (** [] *)
 
 (** **** 练习：5 星, standard, optional (leibniz_equality__equality) 
@@ -484,8 +502,10 @@ Proof.
 Lemma leibniz_equality__equality : forall (X : Type) (x y: X),
   (forall P:X->Prop, P x -> P y) -> x == y.
 Proof.
-(* 请在此处解答 *) Admitted.
-
+  intros X x y H.
+  apply H.
+  apply eq_refl.
+Qed.
 (** [] *)
 
 End MyEquality.
@@ -531,3 +551,4 @@ End MyEquality.
 
 
 (* 2022-03-14 05:26:57 (UTC+00) *)
+(* finish by zerick 2025-11-06 17:46:00 (UTC+8)*)

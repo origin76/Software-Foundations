@@ -2,7 +2,7 @@
 
 Set Warnings "-notation-overridden,-parsing".
 From LF Require Export Logic.
-Require Import Coq.micromega.Lia.
+Require Import Stdlib.micromega.Lia.
 
 (* ################################################################# *)
 (** * 归纳定义的命题 *)
@@ -2785,8 +2785,8 @@ Proof.
     并验证其值与匹配关系是互映的。 *)
 
 (** 我们将要实现的正则表达式匹配器会匹配由 ASCII 字符构成的列表：*)
-Require Import Coq.Strings.Ascii.
-Require Import Coq.Arith.Arith.
+Require Import Stdlib.Strings.Ascii.
+Require Import Stdlib.Arith.Arith.
 
 (* 使用标准库的判定 *)
 Definition eqb_ascii (a b : ascii) : bool :=
