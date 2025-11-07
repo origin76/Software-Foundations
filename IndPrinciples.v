@@ -59,7 +59,13 @@ Proof.
 Theorem plus_one_r' : forall n:nat,
   n + 1 = S n.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply nat_ind.
+  + reflexivity.
+  + intros n H.
+    simpl.
+    rewrite H.
+    reflexivity.
+Qed.
 (** [] *)
 
 (** Coq 为每一个 [Inductive] 定义的数据类型生成了归纳法则，包括那些非递归的。
@@ -167,8 +173,11 @@ Inductive booltree : Type :=
     请写出使用 [Inductive] 来定义的 [ExSet]： *)
 
 Inductive ExSet : Type :=
-  (* 请在此处解答 *)
-.
+  | con1 : bool -> ExSet
+  | con2 : nat -> ExSet -> ExSet.
+
+Check ExSet_ind.
+
 (** [] *)
 
 (* ################################################################# *)
@@ -221,6 +230,11 @@ Check tree_ind.
             forall m : mytype X, P m
 *) 
 (** [] *)
+Inductive mytype (X : Type) : Type :=
+  | constr1 : X -> mytype X
+  | constr2 : nat -> mytype X
+  | constr3 : mytype X -> nat -> mytype X.
+Check mytype_ind.
 
 (** **** 练习：1 星, standard, optional (foo) 
 
@@ -235,6 +249,11 @@ Check tree_ind.
              forall f2 : foo X Y, P f2
 *) 
 (** [] *)
+Inductive foo (X Y : Type) : Type :=
+  | bar : X -> foo X Y
+  | baz : Y -> foo X Y
+  | quux : (nat -> foo X Y) -> foo X Y.
+Check foo_ind.
 
 (** **** 练习：1 星, standard, optional (foo') 
 
@@ -243,6 +262,7 @@ Check tree_ind.
 Inductive foo' (X:Type) : Type :=
   | C1 (l : list X) (f : foo' X)
   | C2.
+Check foo'_ind.
 
 (** Coq 会为 [foo'] 生成什么归纳法则？请填写下面的空白，并使用 Coq 检查你的答案。
 
