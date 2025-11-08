@@ -149,7 +149,18 @@ Proof.
   unfold lt. unfold transitive.
   intros n m o Hnm Hmo.
   induction Hmo as [| m' Hm'o].
-    (* 请在此处解答 *) Admitted.
+  + (* Hmo : m < S m，即 S m <= S m *)
+    apply n_le_m__Sn_le_Sm. 
+    apply le_trans with (b := S n).
+    - apply le_S. apply le_n.
+    - apply Hnm.
+
+  + (* Hmo : m < S (S m')，归纳假设 IHHm'o : n < m -> n < S m' *)
+    apply n_le_m__Sn_le_Sm.
+    apply le_trans with (b := S n).
+    - apply le_S. apply le_n.
+    - apply IHHm'o.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard, optional (lt_trans'') 
@@ -162,7 +173,22 @@ Proof.
   unfold lt. unfold transitive.
   intros n m o Hnm Hmo.
   induction o as [| o'].
-  (* 请在此处解答 *) Admitted.
+  + (* o = 0 *)
+    inversion Hmo.
+  + (* o = S o' *)
+    inversion Hmo; subst.
+    - (* m = o'，所以 Hmo : S m <= S m *)
+      apply n_le_m__Sn_le_Sm. 
+      apply le_trans with (b := S n).
+      -- apply le_S. apply le_n.
+      -- apply Hnm.
+    - (* Hmo : S m <= S o'，即存在 H0 : S m <= o' *)
+      apply n_le_m__Sn_le_Sm. 
+      apply IHo' in H0.
+      apply le_trans with (b := S n).
+      -- apply le_S. apply le_n.
+      -- exact H0.  
+Qed.
 (** [] *)
 
 (** [le] 的传递性反过来也能用于证明一些之后会用到的事实，
@@ -179,7 +205,8 @@ Qed.
 Theorem le_S_n : forall n m,
   (S n <= S m) -> (n <= m).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply le_S_n.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard, optional (le_Sn_n_inf) 
@@ -200,7 +227,17 @@ Proof.
 Theorem le_Sn_n : forall n,
   ~ (S n <= n).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n.
+  unfold not.
+  induction n as [| n' IHn'].
+  - (* n = 0 *)
+    intros H. inversion H.
+  - (* n = S n' *)
+    intros H. 
+    apply IHn'.
+    apply Sn_le_Sm__n_le_m.
+    apply H.
+Qed.
 (** [] *)
 
 (** 在后面的章节中，我们主要会用到自反性和传递性。不过，
@@ -218,7 +255,16 @@ Definition symmetric {X: Type} (R: relation X) :=
 Theorem le_not_symmetric :
   ~ (symmetric le).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  unfold not.
+  unfold symmetric.
+  intros H.
+  (* H : forall a b : nat, a <= b -> b <= a *)
+  (* 我们需要推出矛盾 *)
+  (* 使用 0 和 1 作为反例 *)
+  assert (H01 : 0 <= 1). { apply le_S. apply le_n. }
+  apply H in H01.
+  inversion H01.
+Qed.
 (** [] *)
 
 (** 如果 [R a b] 和 [R b a] 成立时有 [a = b]，那么 [R] 就是_'反对称关系'_。 *)
@@ -230,8 +276,19 @@ Definition antisymmetric {X: Type} (R: relation X) :=
 Theorem le_antisymmetric :
   antisymmetric le.
 Proof.
-  (* 请在此处解答 *) Admitted.
-(** [] *)
+  unfold antisymmetric.
+  intros a b H1 H2.
+  induction H1 as [| b' Hb' IH].
+  - (* a = b *)
+    reflexivity.
+  - (* a <= b', b = S b' *)
+    (* 从 H2 : S b' <= a 和 Hb' : a <= b' *)
+    exfalso.
+    apply (le_Sn_n b').
+    apply le_trans with a.
+    + apply H2.
+    + apply Hb'.
+Qed.
 
 (** **** 练习：2 星, standard, optional (le_step)  *)
 Theorem le_step : forall n m p,
@@ -239,7 +296,16 @@ Theorem le_step : forall n m p,
   m <= S p ->
   n <= p.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m p.
+  intros H1 H2.
+  unfold lt in H1.
+  assert (H : S n <= S p).
+  { apply le_trans with m. apply H1. apply H2. }
+  
+  (* 从 S n <= S p 得到 n <= p *)
+  apply Sn_le_Sm__n_le_m. apply H.
+Qed.
+
 (** [] *)
 
 (* ----------------------------------------------------------------- *)
@@ -342,7 +408,16 @@ Lemma rsc_trans :
       clos_refl_trans_1n R y z ->
       clos_refl_trans_1n R x z.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros X R x y z H1 H2.
+  induction H1 as [| x' y' z' Hxy Hyz IH'].
+  - (* rt1n_refl: x = y *)
+    apply H2.
+  - (* rt1n_trans: x → y' → ... → y *)
+    apply rt1n_trans with y'.
+    + apply Hxy.
+    + apply IH'. apply H2.
+Qed.
+  
 (** [] *)
 
 (** 接着再用这些事实来证明这两个定义的自反性、
@@ -353,7 +428,29 @@ Theorem rtc_rsc_coincide :
          forall (X:Type) (R: relation X) (x y : X),
   clos_refl_trans R x y <-> clos_refl_trans_1n R x y.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros X R x y. split.
+  - (* -> 方向: clos_refl_trans R x y -> clos_refl_trans_1n R x y *)
+    intros H.
+    induction H as [x y HR | x | x y z Hxy IHxy Hyz IHyz].
+    + (* rt_step: R x y *)
+      apply rsc_R. apply HR.
+    + (* rt_refl: x = x *)
+      apply rt1n_refl.
+    + (* rt_trans: x -> y -> z *)
+      apply rsc_trans with y.
+      * apply IHxy.
+      * apply IHyz.
+  - (* <- 方向: clos_refl_trans_1n R x y -> clos_refl_trans R x y *)
+    intros H.
+    induction H as [x | x y z Hxy Hyz IH].
+    + (* rt1n_refl: x = x *)
+      apply rt_refl.
+    + (* rt1n_trans: R x y 且 clos_refl_trans_1n R y z *)
+      apply rt_trans with y.
+      * apply rt_step. apply Hxy.
+      * apply IH.
+Qed.
 (** [] *)
 
 (* 2022-03-14 05:26:58 (UTC+00) *)
+(*finish by zerick 2025-11-08 23:51:00 (UTC+8)*)
