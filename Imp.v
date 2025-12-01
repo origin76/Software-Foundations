@@ -23,7 +23,7 @@ From Coq Require Import Bool.Bool.
 From Coq Require Import Init.Nat.
 From Coq Require Import Arith.Arith.
 From Coq Require Import Arith.EqNat.
-From Coq Require Import omega.Omega.
+Require Import Stdlib.micromega.Lia.
 From Coq Require Import Lists.List.
 From Coq Require Import Strings.String.
 Import ListNotations.
@@ -376,13 +376,26 @@ Qed.
     [bexp] 的值。请编写一个对 [bexp] 执行此变换的函数，并证明它的可靠性。
     利用我们刚学过的泛策略来构造一个尽可能优雅的证明。 *)
 
-Fixpoint optimize_0plus_b (b : bexp) : bexp
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint optimize_0plus_b (b : bexp) : bexp :=
+  match b with
+  | BTrue       => BTrue
+  | BFalse      => BFalse
+  | BEq a1 a2   => BEq (optimize_0plus a1) (optimize_0plus a2)
+  | BLe a1 a2   => BLe (optimize_0plus a1) (optimize_0plus a2)
+  | BNot b1     => BNot (optimize_0plus_b b1)
+  | BAnd b1 b2  => BAnd (optimize_0plus_b b1) (optimize_0plus_b b2)
+  end.
 
 Theorem optimize_0plus_b_sound : forall b,
   beval (optimize_0plus_b b) = beval b.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  induction b; simpl; 
+    (* 对于 BEq 和 BLe 情况，我们需要重写内部的 aexp *)
+    repeat rewrite optimize_0plus_sound;
+    (* 对于 BNot 和 BAnd 情况，我们需要使用归纳假设 *)
+    try rewrite IHb; try rewrite IHb1; try rewrite IHb2;
+    reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：4 星, standard, optional (optimize) 
@@ -445,7 +458,7 @@ Example silly_presburger_example : forall m n o p,
   m + n <= n + o /\ o + 3 = p + 3 ->
   m <= p.
 Proof.
-  intros. omega.
+  intros. lia.
 Qed.
 
 (** （注意本文件顶部 [From Coq Require Import omega.Omega.]。）*)
@@ -695,16 +708,66 @@ Qed.
 (** **** 练习：3 星, standard (bevalR) 
 
     用和 [aevalR] 同样的方式写出关系 [bevalR]，并证明它等价于 [beval]。 *)
-
 Inductive bevalR: bexp -> bool -> Prop :=
-(* 请在此处解答 *)
-.
+  | E_BTrue : bevalR BTrue true
+  | E_BFalse : bevalR BFalse false
+  | E_BEq (a1 a2 : aexp) (n1 n2 : nat) :
+      aevalR a1 n1 ->          (* 前提：a1 的值是 n1 *)
+      aevalR a2 n2 ->          (* 前提：a2 的值是 n2 *)
+      bevalR (BEq a1 a2) (n1 =? n2) (* 结果：BEq 的值是 n1 与 n2 比较的结果 *)
+  | E_BLe (a1 a2 : aexp) (n1 n2 : nat) :
+      aevalR a1 n1 ->
+      aevalR a2 n2 ->
+      bevalR (BLe a1 a2) (n1 <=? n2)
+  | E_BNot (b : bexp) (bv : bool) :
+      bevalR b bv ->           (* 前提：b 的值是 bv *)
+      bevalR (BNot b) (negb bv)(* 结果：BNot b 的值是 negb bv *)
+  | E_BAnd (b1 b2 : bexp) (bv1 bv2 : bool) :
+      bevalR b1 bv1 ->
+      bevalR b2 bv2 ->
+      bevalR (BAnd b1 b2) (andb bv1 bv2).
 
 Lemma beval_iff_bevalR : forall b bv,
   bevalR b bv <-> beval b = bv.
 Proof.
-  (* 请在此处解答 *) Admitted.
-(** [] *)
+  split.
+  (* 方向 -> : 已知关系成立，证明函数结果相等 *)
+  - intros H.
+    induction H; simpl.
+    + (* E_BTrue *) reflexivity.
+    + (* E_BFalse *) reflexivity.
+    + (* E_BEq *) 
+      (* 利用之前证明过的引理：aevalR a n <-> aeval a = n *)
+      apply aeval_iff_aevalR in H. 
+      apply aeval_iff_aevalR in H0.
+      rewrite H. rewrite H0. reflexivity.
+    + (* E_BLe *) 
+      apply aeval_iff_aevalR in H. 
+      apply aeval_iff_aevalR in H0.
+      rewrite H. rewrite H0. reflexivity.
+    + (* E_BNot *) rewrite IHbevalR. reflexivity.
+    + (* E_BAnd *) rewrite IHbevalR1. rewrite IHbevalR2. reflexivity.
+    
+  (* 方向 <- : 已知函数结果相等，证明关系成立 *)
+  - intros H.
+    rewrite <- H. 
+    clear bv H.
+    induction b; simpl.
+    + (* BTrue *) apply E_BTrue.
+    + (* BFalse *) apply E_BFalse.
+    + (* BEq *) 
+      apply E_BEq. 
+      * apply aeval_iff_aevalR. reflexivity.
+      * apply aeval_iff_aevalR. reflexivity.
+    + (* BLe *) 
+      apply E_BLe.
+      * apply aeval_iff_aevalR. reflexivity.
+      * apply aeval_iff_aevalR. reflexivity.
+    + (* BNot *) apply E_BNot. apply IHb. 
+    + (* BAnd *) apply E_BAnd.
+      * apply IHb1.
+      * apply IHb2.
+Qed.
 
 End AExp.
 
@@ -727,7 +790,7 @@ Inductive aexp : Type :=
   | AMult (a1 a2 : aexp)
   | ADiv (a1 a2 : aexp).         (* <--- 新增 *)
 
-(** 扩展 [aeval] 的定义来处理此讯算并不是很直观（我们要返回什么作为
+(** 扩展 [aeval] 的定义来处理此运算并不是很直观（我们要返回什么作为
     [ADiv (ANum 5) (ANum 0)] 的结果？）。然而扩展 [aevalR] 却很简单。*)
 
 Reserved Notation "e '==>' n"
@@ -1304,24 +1367,68 @@ Example ceval_example2:
     X ::= 0;; Y ::= 1;; Z ::= 2
   ]=> (Z !-> 2 ; Y !-> 1 ; X !-> 0).
 Proof.
-  (* 请在此处解答 *) Admitted.
-(** [] *)
+  (* 第一步：处理 X ::= 0 *)
+  (* 我们必须显式告诉 Coq，跑完第一条命令后的中间状态是 (X !-> 0) *)
+  apply E_Seq with (st' := (X !-> 0)).
+  - (* 证明 X ::= 0 能够产生中间状态 *)
+    apply E_Ass. reflexivity.
+  
+  (* 第二步：处理剩下的 Y ::= 1;; Z ::= 2 *)
+  (* 当前起始状态变成了 (X !-> 0) *)
+  (* 我们再次使用 E_Seq，这次的中间状态是 (Y !-> 1; X !-> 0) *)
+  - apply E_Seq with (st' := (Y !-> 1 ; X !-> 0)).
+    + (* 证明 Y ::= 1 *)
+      apply E_Ass. reflexivity.
+    + (* 证明 Z ::= 2 *)
+      apply E_Ass. reflexivity.
+Qed.
 
 (** **** 练习：3 星, standard, optional (pup_to_n) 
 
     写一个 Imp 程序对从 [1] 到 [X] 进行求值（包括：将 [1 + 2 + ... + X]) 赋予变量 [Y]。
    证明此程序对于 [X] = [2] 会按预期执行（这可能比你预想的还要棘手）。 *)
 
-Definition pup_to_n : com
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition pup_to_n : com :=
+  Y ::= 0 ;;
+  WHILE ~(X = 0) DO
+    Y ::= Y + X ;;
+    X ::= X - 1
+  END.
 
 Theorem pup_to_2_ceval :
   (X !-> 2) =[
     pup_to_n
   ]=> (X !-> 0 ; Y !-> 3 ; X !-> 1 ; Y !-> 2 ; Y !-> 0 ; X !-> 2).
 Proof.
-  (* 请在此处解答 *) Admitted.
-(** [] *)
+  unfold pup_to_n.
+  (* 1. 处理初始化 Y ::= 0 *)
+  eapply E_Seq.
+  - apply E_Ass. reflexivity.
+  
+  (* 2. 进入第一次循环 *)
+  (* 此时 X = 2, 条件 ~(X=0) 为真 *)
+  - intros.
+    eapply E_WhileTrue.
+    + (* 证明条件为真 *) reflexivity.
+    + (* 执行循环体： Y ::= Y + X ;; X ::= X - 1 *)
+      eapply E_Seq.
+      * apply E_Ass. reflexivity. (* Y 变成 0+2=2 *)
+      * apply E_Ass. reflexivity. (* X 变成 2-1=1 *)
+    
+    (* 3. 进入第二次循环 *)
+    (* 此时 X = 1, 条件 ~(X=0) 为真 *)
+    + eapply E_WhileTrue.
+      * (* 证明条件为真 *) reflexivity.
+      * (* 执行循环体 *)
+        eapply E_Seq.
+        apply E_Ass. reflexivity. (* Y 变成 2+1=3 *)
+        apply E_Ass. reflexivity. (* X 变成 1-1=0 *)
+      
+      (* 4. 循环结束 *)
+      (* 此时 X = 0, 条件 ~(X=0) 为假 *)
+      * apply E_WhileFalse.
+        reflexivity.
+Qed.
 
 (* ================================================================= *)
 (** ** 求值的确定性 *)
@@ -1406,11 +1513,28 @@ Proof.
   intros st st' contra. unfold loop in contra.
   remember (WHILE true DO SKIP END)%imp as loopdef
            eqn:Heqloopdef.
+  (* 关键：使用 induction 对推导树进行归纳。
+     try discriminate 会自动清除掉 SKIP, ASS, SEQ, IF 等明显不匹配 loopdef 的情况，
+     只留下 E_WhileFalse 和 E_WhileTrue。 *)
+  induction contra; try discriminate.
 
-  (** 归纳讨论假设“[loopdef] 会终止”之构造，其中多数情形的矛盾显而易见，
-      可用 [discriminate] 一步解决。 *)
+  - (* Case: E_WhileFalse *)
+    (* 假设循环是因为条件为假而终止的。
+       H : beval st b = false
+       Heqloopdef : WHILE b ... = WHILE true ...
+       这导致 true = false 的矛盾。 *)
+    inversion Heqloopdef. rewrite H1 in H. discriminate.
 
-  (* 请在此处解答 *) Admitted.
+  - (* Case: E_WhileTrue *)
+    (* 假设循环走了一步 (E_WhileTrue)。
+       IHcontra2 是归纳假设，它说：
+       如果剩下的循环 (contra2) 也是 loopdef,那么它是矛盾的。 *)
+    inversion Heqloopdef.
+    (* 我们只要应用归纳假设即可 *)
+    apply IHcontra2. 
+    rewrite H1. rewrite H2. simpl.
+    reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, standard (no_whiles_eqv) 
