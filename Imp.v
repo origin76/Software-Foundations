@@ -1562,13 +1562,58 @@ Close Scope imp_scope.
     [WHILE] 循环的程序时才可以证明。之后证明它与 [no_whiles] 等价。 *)
 
 Inductive no_whilesR: com -> Prop :=
- (* 请在此处解答 *)
-.
+  | ESkip : no_whilesR SKIP
+  | EAss  : forall x a, no_whilesR (x ::= a)
+  | ESeq  : forall c1 c2, 
+      no_whilesR c1 -> 
+      no_whilesR c2 -> 
+      no_whilesR (c1 ;; c2)
+  | EIf   : forall b ct cf, 
+      no_whilesR ct -> 
+      no_whilesR cf -> 
+      no_whilesR (TEST b THEN ct ELSE cf FI).
 
 Theorem no_whiles_eqv:
    forall c, no_whiles c = true <-> no_whilesR c.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  split.
+  
+  (* -> 方向：已知函数返回 true，证明关系成立 *)
+  - intros H. 
+    induction c.
+    (* Case: SKIP *)
+    + apply ESkip.
+    (* Case: Ass *)
+    + apply EAss.
+    (* Case: Seq *)
+    + simpl in H.
+      (* 利用 andb_true_iff 把 andb x y = true 拆成 x=true /\ y=true *)
+      apply Bool.andb_true_iff in H. destruct H as [H1 H2].
+      apply ESeq.
+      * apply IHc1. apply H1.
+      * apply IHc2. apply H2.
+    (* Case: If *)
+    + simpl in H.
+      apply Bool.andb_true_iff in H. destruct H as [H1 H2].
+      apply EIf.
+      * apply IHc1. apply H1.
+      * apply IHc2. apply H2.
+    (* Case: While *)
+    + (* H : false = true *)
+      simpl in H. discriminate H.
+
+  (* <- 方向：已知关系成立，证明函数返回 true *)
+  - intros H.
+    induction H; simpl.
+    (* Case: E_Skip *)
+    + reflexivity.
+    (* Case: E_Ass *)
+    + reflexivity.
+    (* Case: E_Seq *)
+    + rewrite IHno_whilesR1. rewrite IHno_whilesR2. reflexivity.
+    (* Case: E_If *)
+    + rewrite IHno_whilesR1. rewrite IHno_whilesR2. reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：4 星, standard (no_whiles_terminating) 
@@ -1578,7 +1623,57 @@ Proof.
 
     按照你的偏好使用 [no_whiles] 或 [no_whilesR]。 *)
 
-(* 请在此处解答 *)
+Theorem no_whiles_terminating : forall c,
+  no_whilesR c ->
+  forall st, exists st', st =[ c ]=> st'.
+Proof.
+  intros c H. 
+  (* 对 no_whilesR 的证据进行归纳。
+     这会自动生成 Skip, Ass, Seq, If 四种情况，
+     并且自动排除了 While 的情况。 *)
+  induction H.
+  
+  - (* Case: Skip *)
+    intros st.
+    exists st. apply E_Skip.
+  
+  - (* Case: Ass *)
+    intros st0. (* 避免变量名冲突 *)
+    exists (x !-> aeval st0 a ; st0).
+    apply E_Ass. reflexivity.
+  
+  - (* Case: Seq *)
+    intros st.
+    (* 利用归纳假设 IHno_whilesR1：c1 一定会终止 *)
+    destruct (IHno_whilesR1 st) as [st' Hstep1].
+    (* 利用归纳假设 IHno_whilesR2：c2 从 st' 开始也一定会终止 *)
+    destruct (IHno_whilesR2 st') as [st'' Hstep2].
+    (* 构造最终状态 st'' *)
+    exists st''.
+    apply E_Seq with st'.
+    + apply Hstep1.
+    + apply Hstep2.
+
+  - (* Case: If *)
+    intros st.
+    (* 我们需要知道条件 b 的值是 true 还是 false *)
+    remember (beval st b) as bval.
+    destruct bval.
+    + (* bval = true，走 THEN 分支 *)
+      (* 利用 ct 的归纳假设 *)
+      destruct (IHno_whilesR1 st) as [st' Htrue].
+      exists st'.
+      apply E_IfTrue.
+      * rewrite Heqbval. reflexivity.
+      * apply Htrue.
+    + (* bval = false，走 ELSE 分支 *)
+      (* 利用 cf 的归纳假设 *)
+      destruct (IHno_whilesR2 st) as [st' Hfalse].
+      exists st'.
+      apply E_IfFalse.
+      * rewrite Heqbval. reflexivity.
+      * apply Hfalse.
+Qed.
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_no_whiles_terminating : option (nat*string) := None.
@@ -1636,33 +1731,62 @@ Inductive sinstr : Type :=
 
 Fixpoint s_execute (st : state) (stack : list nat)
                    (prog : list sinstr)
-                 : list nat
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+                 : list nat :=
+  match prog with
+  | [] => stack
+  | instr :: rest =>
+      match instr with
+      | SPush n => s_execute st (n :: stack) rest
+      | SLoad x => s_execute st ((st x) :: stack) rest
+      | SPlus =>
+          match stack with
+          | n2 :: n1 :: stack' => s_execute st ((n1 + n2) :: stack') rest
+          | _ => stack (* 栈下溢，未定义行为，此处选择直接返回 *)
+          end
+      | SMinus =>
+          match stack with
+          | n2 :: n1 :: stack' => s_execute st ((n1 - n2) :: stack') rest
+          (* 注意：n2 是栈顶（后压入的），n1 是次栈顶（先压入的）。运算应为 n1 - n2 *)
+          | _ => stack
+          end
+      | SMult =>
+          match stack with
+          | n2 :: n1 :: stack' => s_execute st ((n1 * n2) :: stack') rest
+          | _ => stack
+          end
+      end
+  end.
 
 Example s_execute1 :
      s_execute empty_st []
        [SPush 5; SPush 3; SPush 1; SMinus]
    = [2; 5].
-(* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 Example s_execute2 :
      s_execute (X !-> 3) [3;4]
        [SPush 4; SLoad X; SMult; SPlus]
    = [15; 4].
-(* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 
 (** 接下来请编写一个将 [aexp] 编译成栈机器程序的函数。运行此程序的效果
     应当和将该表达式的值压入栈中一致。 *)
 
-Fixpoint s_compile (e : aexp) : list sinstr
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint s_compile (e : aexp) : list sinstr :=
+  match e with
+  | ANum n       => [SPush n]
+  | AId x        => [SLoad x]
+  | APlus a1 a2  => (s_compile a1) ++ (s_compile a2) ++ [SPlus]
+  | AMinus a1 a2 => (s_compile a1) ++ (s_compile a2) ++ [SMinus]
+  | AMult a1 a2  => (s_compile a1) ++ (s_compile a2) ++ [SMult]
+  end.
 
 (** 在定义完 [s_compile] 之后，请证明以下示例来测试它是否起作用。 *)
 
 Example s_compile1 :
   s_compile (X - (2 * Y))
   = [SLoad X; SPush 2; SLoad Y; SMult; SMinus].
-(* 请在此处解答 *) Admitted.
+Proof. reflexivity. Qed.
 (** [] *)
 
 (** **** 练习：4 星, advanced (stack_compiler_correct) 
@@ -1674,10 +1798,77 @@ Example s_compile1 :
     请证明以下定理。你需要先陈述一个更一般的引理来得到一个有用的归纳假设，
     由它的话主定理就只是一个简单的推论了。 *)
 
+Lemma s_compile_correct_aux : forall st e stack prog,
+  s_execute st stack (s_compile e ++ prog) = s_execute st ((aeval st e) :: stack) prog.
+Proof.
+  induction e; intros; simpl.
+  - (* ANum *) 
+    reflexivity.
+  - (* AId *) 
+    reflexivity.
+  - (* APlus *)
+    (* 目标形式大约是: s_execute ... ((c1 ++ c2 ++ [SPlus]) ++ prog) ... *)
+    (* 我们需要用结合律把括号往右移，变成: c1 ++ (c2 ++ ([SPlus] ++ prog)) *)
+    rewrite app_assoc.
+    assert (H:((s_compile e1 ++ s_compile e2) ++ [SPlus]) ++ prog = s_compile e1 ++ (s_compile e2 ++ ([SPlus] ++ prog))).
+    {
+      repeat rewrite app_assoc. 
+      reflexivity. 
+    }
+    rewrite H.
+    
+    (* 现在可以对 c1 应用归纳假设 *)
+    rewrite IHe1.
+    
+    (* 此时栈变成了 (aeval e1 :: stack)，接下来的指令是 c2 ++ ... *)
+    (* 我们对 c2 应用归纳假设 *)
+    rewrite IHe2.
+    
+    (* 此时栈变成了 (aeval e2 :: aeval e1 :: stack)，接下来的指令是 [SPlus] ++ prog *)
+    (* 根据 s_execute 的定义，SPlus 会取栈顶两个元素相加 *)
+    simpl. 
+    (* (aeval e1 + aeval e2) 正好等于 aeval (APlus e1 e2) *)
+    reflexivity.
+    
+  - (* AMinus *)
+    rewrite app_assoc. 
+    assert (H:((s_compile e1 ++ s_compile e2) ++ [SMinus]) ++ prog = s_compile e1 ++ (s_compile e2 ++ ([SMinus] ++ prog))).
+    {
+      repeat rewrite app_assoc. 
+      reflexivity. 
+    }
+    rewrite H.
+    rewrite IHe1. rewrite IHe2.
+    simpl. reflexivity.
+    
+  - (* AMult *)
+    rewrite app_assoc.
+    assert (H:((s_compile e1 ++ s_compile e2) ++ [SMult]) ++ prog = s_compile e1 ++ (s_compile e2 ++ ([SMult] ++ prog))).
+    {
+      repeat rewrite app_assoc. 
+      reflexivity. 
+    }
+    rewrite H.
+    rewrite IHe1. rewrite IHe2.
+    simpl. reflexivity.
+Qed.
+
 Theorem s_compile_correct : forall (st : state) (e : aexp),
   s_execute st [] (s_compile e) = [ aeval st e ].
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros.
+  (* 技巧：把 s_compile e 写成 s_compile e ++ [] *)
+  (* 这样才能匹配我们的通用引理 *)
+  rewrite <- app_nil_r.
+  rewrite <- app_nil_r with (l := s_compile e).
+  
+  (* 应用引理 *)
+  rewrite s_compile_correct_aux with (stack:=[]) (prog:= nil).
+  
+  (* 剩下的就是 s_execute st [val] []，根据定义这就是 [val] *)
+  simpl.
+  reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, standard, optional (short_circuit) 
@@ -1785,7 +1976,56 @@ Reserved Notation "st '=[' c ']=>' st' '/' s"
 Inductive ceval : com -> state -> result -> state -> Prop :=
   | E_Skip : forall st,
       st =[ CSkip ]=> st / SContinue
-  (* 请在此处解答 *)
+  | E_Break : forall st,
+      st =[ CBreak ]=> st / SBreak
+  (* 赋值：更新状态，总是返回 SContinue *)
+  | E_Ass : forall st a1 n x,
+      aeval st a1 = n ->
+      st =[ CAss x a1 ]=> (x !-> n ; st) / SContinue
+      
+  (* 序列 - 情况 1：第一条指令正常结束 *)
+  | E_Seq : forall c1 c2 st st' st'' s,
+      st  =[ c1 ]=> st' / SContinue ->
+      st' =[ c2 ]=> st'' / s ->
+      st  =[ CSeq c1 c2 ]=> st'' / s
+      
+  (* 序列 - 情况 2：第一条指令 Break 了 *)
+  (* 描述中说：“如果它产生了 [SBreak]，我们就跳过 [c2] 的执行” *)
+  | E_SeqBreak : forall c1 c2 st st',
+      st =[ c1 ]=> st' / SBreak ->
+      st =[ CSeq c1 c2 ]=> st' / SBreak
+      
+  (* If - True 分支 *)
+  | E_IfTrue : forall st st' b c1 c2 s,
+      beval st b = true ->
+      st =[ c1 ]=> st' / s ->
+      st =[ CIf b c1 c2 ]=> st' / s
+      
+  (* If - False 分支 *)
+  | E_IfFalse : forall st st' b c1 c2 s,
+      beval st b = false ->
+      st =[ c2 ]=> st' / s ->
+      st =[ CIf b c1 c2 ]=> st' / s
+      
+  (* While - 循环条件为假，直接结束 *)
+  | E_WhileFalse : forall b st c,
+      beval st b = false ->
+      st =[ CWhile b c ]=> st / SContinue
+      
+  (* While - 循环体执行了一次，且结果是 SContinue，继续循环 *)
+  | E_WhileLoop : forall st st' st'' b c s,
+      beval st b = true ->
+      st  =[ c ]=> st' / SContinue ->
+      st' =[ CWhile b c ]=> st'' / s ->
+      st  =[ CWhile b c ]=> st'' / s
+      
+  (* While - 循环体执行了一次，结果是 SBreak，终止循环 *)
+  (* 描述中说：“[BREAK] 只终止最内层的循环，因此 [WHILE] 发出 [SContinue] 的信号” *)
+  (* 注意这里的返回值是 SContinue，这表示 Break 被“捕获”并处理了 *)
+  | E_WhileBreak : forall st st' b c,
+      beval st b = true ->
+      st =[ c ]=> st' / SBreak ->
+      st =[ CWhile b c ]=> st' / SContinue
 
   where "st '=[' c ']=>' st' '/' s" := (ceval c st s st').
 
@@ -1795,20 +2035,66 @@ Theorem break_ignore : forall c st st' s,
      st =[ BREAK;; c ]=> st' / s ->
      st = st'.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros c st st' s H.
+  (* 关键步骤：拆解 H，看看它是用哪个规则构造的 *)
+  inversion H; subst.
+  
+  - (* 情况 1：E_Seq *)
+    (* 这里的假设 H2 说：st =[ BREAK ]=> ... / SContinue *)
+    (* 但我们知道 BREAK 只能产生 SBreak，不能产生 SContinue *)
+    inversion H2. (* 矛盾，直接解决 *)
+    
+  - (* 情况 2：E_SeqBreak *)
+    (* 这里的假设 H5 说：st =[ BREAK ]=> st' / SBreak *)
+    (* 我们再拆解 H5，看看 BREAK 是怎么执行的 *)
+    inversion H5. subst.
+    (* 根据 E_Break 规则，状态不会改变，所以 st = st' 自动成立 *)
+    reflexivity.
+Qed.
 
 Theorem while_continue : forall b c st st' s,
   st =[ WHILE b DO c END ]=> st' / s ->
   s = SContinue.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros b c st st' s H.
+  (* 1. 记住我们正在处理的是 WHILE 循环，以便进行归纳 *)
+  remember (WHILE b DO c END) as loopdef eqn:Heqloop.
+  
+  (* 2. 对执行证据 H 进行归纳 *)
+  induction H; try discriminate.
+  
+  - (* E_WhileFalse: 条件为假，直接结束 *)
+    (* 规则定义直接返回 SContinue，reflexivity 即可 *)
+    reflexivity.
+    
+  - (* E_WhileLoop: 循环体正常结束，继续下一轮 *)
+    (* 
+       H: 循环体执行了一次
+       H0: 剩下的循环继续执行，结果为 s
+       IHceval2: 归纳假设，它告诉我们“剩下的那个循环”如果结束了，结果必然是 SContinue
+    *)
+    apply IHceval2. 
+    apply Heqloop. (* 告诉 IH，剩下的循环依然是那个 loopdef *)
+    
+  - (* E_WhileBreak: 循环体 Break 了，被捕获 *)
+    (* 规则定义 E_WhileBreak 显式返回 SContinue *)
+    reflexivity.
+Qed.
 
 Theorem while_stops_on_break : forall b c st st',
   beval st b = true ->
   st =[ c ]=> st' / SBreak ->
   st =[ WHILE b DO c END ]=> st' / SContinue.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros b c st st' Hcond Hbody.
+  (* 直接应用规则 E_WhileBreak *)
+  apply E_WhileBreak.
+  - (* 证明条件为真 *)
+    apply Hcond.
+  - (* 证明循环体产生 Break *)
+    apply Hbody.
+Qed.
+  
 (** [] *)
 
 (** **** 练习：3 星, advanced, optional (while_break_true)  *)
@@ -1817,7 +2103,42 @@ Theorem while_break_true : forall b c st st',
   beval st' b = true ->
   exists st'', st'' =[ c ]=> st' / SBreak.
 Proof.
-(* 请在此处解答 *) Admitted.
+ intros b c st st' H Hcond.
+  (* 1. 记住循环结构以便归纳 *)
+  remember (WHILE b DO c END) as loopdef eqn:Heqloop.
+  
+  (* 2. 对执行证据 H 进行归纳 *)
+  induction H; try discriminate.
+
+  - (* Case: E_WhileFalse *)
+    (* 这里的逻辑：
+       H: beval st b = false (循环退出的理由)
+       Hcond: beval st' b = true (题目给的前提)
+       根据规则 E_WhileFalse，st = st'。
+       于是 st 既要是 false 又是 true，产生矛盾。 *)
+    inversion Heqloop; subst.
+    rewrite H in Hcond. 
+    discriminate.
+
+  - (* Case: E_WhileLoop *)
+    (* 这里的逻辑：
+       st -> ... -> st'。
+       当前这一步是正常执行 (SContinue)，所以 Break 肯定发生在剩下的递归里。
+       直接应用归纳假设 IHceval2。 *)
+    apply IHceval2.
+    + apply Heqloop. (* 传递 loopdef *)
+    + apply Hcond.   (* 传递条件为真的前提 *)
+
+  - (* Case: E_WhileBreak *)
+    (* 这里的逻辑：
+       st =[ c ]=> st' / SBreak。
+       这正是循环通过 Break 终止的情况。
+       我们需要证明 exists st'', st'' =[ c ]=> st' / SBreak。
+       这里的 st'' 就是当前的 st。 *)
+    inversion Heqloop; subst.
+    exists st.
+    apply H0. (* H0 就是 st =[ c ]=> st' / SBreak *)
+Qed.
 (** [] *)
 
 (** **** 练习：4 星, advanced, optional (ceval_deterministic)  *)
@@ -1826,8 +2147,121 @@ Theorem ceval_deterministic: forall (c:com) st st1 st2 s1 s2,
      st =[ c ]=> st2 / s2 ->
      st1 = st2 /\ s1 = s2.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros c st st1 st2 s1 s2 H1 H2.
+  generalize dependent s2.
+  generalize dependent st2.
+  
+  induction H1; intros st2 s2 H2; inversion H2; subst.
 
+  (* Case: E_Skip *)
+  - split; reflexivity.
+  
+  (* Case: E_Break *)
+  - split; reflexivity.
+  
+  (* Case: E_Ass *)
+  - split; reflexivity.
+  
+  (* Case: E_Seq vs E_Seq *)
+  (* 此时上下文里会有类似 H3: st =[ c1 ]=> st'0 ... 和 H6: st'0 =[ c2 ]=> st2 ... *)
+  - assert (st' = st'0 /\ SContinue = SContinue).
+    { apply IHceval1. assumption. } (* assumption 会自动找到那个匹配 c1 的假设 *)
+    destruct H as [Eq _]. subst.
+    apply IHceval2. assumption.
+
+  (* Case: E_Seq vs E_SeqBreak *)
+  - assert (st' = st2 /\ SContinue = SBreak).
+    { apply IHceval1. assumption. }
+    destruct H as [_ Contra]. discriminate.
+
+  (* Case: E_SeqBreak vs E_Seq *)
+  - assert (st' = st'0 /\ SBreak = SContinue).
+    { apply IHceval. assumption. }
+    destruct H as [_ Contra]. discriminate.
+
+  (* Case: E_SeqBreak vs E_SeqBreak *)
+  - apply IHceval. assumption.
+
+  (* Case: E_IfTrue vs E_IfTrue *)
+  - apply IHceval. assumption.
+
+  (* Case: E_IfTrue vs E_IfFalse *)
+  - rewrite H in H8. discriminate H8.
+
+  (* Case: E_IfFalse vs E_IfTrue *)
+  - rewrite H in H8. discriminate H8.
+
+  (* Case: E_IfFalse vs E_IfFalse *)
+  - apply IHceval. assumption.
+
+  (* Case: E_WhileFalse vs E_WhileFalse *)
+  - split; reflexivity.
+  
+  (* Case: E_WhileFalse vs E_WhileLoop/Break *)
+  - rewrite H in H3. discriminate H3.
+  - rewrite H in H3. discriminate H3.
+
+  (* Case: E_WhileLoop vs E_WhileFalse *)
+  - rewrite H in H6. discriminate H6.
+
+  (* E_WhileLoop vs E_WhileLoop *)
+  - assert (st' = st'0 /\ SContinue = SContinue) as EqBody.
+  { 
+    apply IHceval1. 
+    apply H4. (* 将右边的循环体执行证据 H4 喂给归纳假设 *)
+  }
+  
+  (* 2. 拆解相等关系，并进行替换 (subst) *)
+  (* 这一步非常关键：它会把上下文中所有的 st'0 替换成 st' *)
+  destruct EqBody as [EqSt _]. subst.
+  
+  (* 3. 现在右边的剩余循环变成了 st' =[ WHILE... ]=> st2 / s2 *)
+  (* 这正好匹配 IHceval2 的前提 *)
+  apply IHceval2.
+  apply H8. (* H8 是右边剩余循环的执行证据 *)
+
+  (* Case: E_WhileLoop vs E_WhileBreak *)
+  -  assert (st' = st2 /\ SContinue = SBreak) as Contra.
+  { 
+    apply IHceval1. (* IH 说：凡是 c 的执行，结果都得跟左边一样 *)
+    apply H7.       (* 把右边的执行证据 H7 喂进去 *)
+  }
+
+  (* 2. 现在我们得到了 SContinue = SBreak 这个荒谬的结论 *)
+  destruct Contra as [_ FalseEq].
+
+  (* 3. 判决死刑，结束证明 *)
+  discriminate FalseEq.
+
+  (* Case: E_WhileLoop vs E_WhileBreak *)
+  - rewrite H in H7. discriminate H7.
+
+  (* Case: E_WhileBreak vs E_WhileLoop *)
+  - assert (st' = st'0 /\ SBreak = SContinue) as Contra.
+  { 
+    apply IHceval. (* IH 说：c 的任何执行结果都得是 SBreak *)
+    apply H5.      (* 把右边的执行证据 H5 (结果是 SContinue) 喂进去 *)
+  }
+
+  (* 2. 现在我们得到了 SBreak = SContinue 这个矛盾 *)
+  destruct Contra as [_ FalseEq].
+
+  (* 3. 利用矛盾解决证明 *)
+  discriminate FalseEq.
+
+  (* Case: E_WhileBreak vs E_WhileBreak *)
+  - assert (st' = st2 /\ SBreak = SBreak) as Eq.
+  { 
+    apply IHceval. 
+    apply H8. (* 将右边的证据 H8 喂给 IH *)
+  }
+
+  (* 2. 提取状态相等的结论，并进行替换 *)
+  destruct Eq as [EqSt _]. subst.
+
+  (* 3. 此时目标变成 st2 = st2 /\ SContinue = SContinue *)
+  split; reflexivity.
+Qed.
 (** [] *)
 End BreakImp.
 
