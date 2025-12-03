@@ -2197,11 +2197,11 @@ Proof.
   (* Case: E_WhileFalse vs E_WhileFalse *)
   - split; reflexivity.
   
-  (* Case: E_WhileFalse vs E_WhileLoop/Break *)
+  (* Case: E_WhileFalse vs E_WhileLoop *)
   - rewrite H in H3. discriminate H3.
   - rewrite H in H3. discriminate H3.
 
-  (* Case: E_WhileLoop vs E_WhileFalse *)
+  (* Case: E_WhileFalse vs E_WhileBreak *)
   - rewrite H in H6. discriminate H6.
 
   (* E_WhileLoop vs E_WhileLoop *)
@@ -2233,7 +2233,7 @@ Proof.
   (* 3. 判决死刑，结束证明 *)
   discriminate FalseEq.
 
-  (* Case: E_WhileLoop vs E_WhileBreak *)
+  (* Case: E_WhileBreak vs E_WhileFalse *)
   - rewrite H in H7. discriminate H7.
 
   (* Case: E_WhileBreak vs E_WhileLoop *)
