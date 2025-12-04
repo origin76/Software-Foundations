@@ -689,6 +689,14 @@ Proof.
     apply le_S. exact IH.
 Qed.
 
+Theorem le_plus_r : forall a b,
+  a <= b + a.
+Proof.
+  intros a b.
+  rewrite plus_comm.
+  apply le_plus_l.
+Qed.
+
 Theorem plus_le : forall n1 n2 m,
   n1 + n2 <= m ->
   n1 <= m /\ n2 <= m.

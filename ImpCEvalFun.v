@@ -7,7 +7,7 @@
 (* ################################################################# *)
 (** * 一个无法完成的求值器 *)
 
-From Coq Require Import omega.Omega.
+Require Import Stdlib.micromega.Lia.
 From Coq Require Import Arith.Arith.
 From LF Require Import Imp Maps.
 
@@ -189,16 +189,20 @@ Definition test_ceval (st:state) (c:com) :=
     编写一个 Imp 程序对 [1] 到 [X] 求和（即 [1 + 2 + ... + X]）并赋值给 [Y]。
     确保你的解答能满足之后的测试。 *)
 
-Definition pup_to_n : com
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition pup_to_n : com :=
+  Y ::= 0;;                (* 1. 初始化累加器 Y 为 0 *)
+  WHILE ~(X = 0) DO        (* 2. 当 X 不为 0 时循环 *)
+    Y ::= Y + X;;          (* 3. 将当前的 X 加到 Y 上 *)
+    X ::= X - 1            (* 4. X 减 1 *)
+  END.
 
-(* 
+
 
 Example pup_to_n_1 :
   test_ceval (X !-> 5) pup_to_n
   = Some (0, 15, 0).
 Proof. reflexivity. Qed.
-*)
+
 (** [] *)
 
 (** **** 练习：2 星, standard, optional (peven) 
@@ -206,9 +210,22 @@ Proof. reflexivity. Qed.
     编写一个 [Imp] 程序：该程序在 [X] 为偶数时将 [Z] 置为 [0]，
     否则将 [Z] 置为 [1]。使用 [test_ceval] 测试你的程序。 *)
 
-(* 请在此处解答
+Definition peven : com :=
+  WHILE 2 <= X DO
+    X ::= X - 2
+  END;;
+  Z ::= X.
 
-    [] *)
+Example test_peven_even :
+  test_ceval (X !-> 10) peven
+  = Some (0, 0, 0).
+Proof. reflexivity. Qed.
+
+Example test_peven_odd :
+  test_ceval (X !-> 7) peven
+  = Some (1, 0, 1).
+Proof. reflexivity. Qed.
+  
 
 (* ################################################################# *)
 (** * 关系求值 vs. 计步求值 *)
@@ -292,7 +309,7 @@ induction i1 as [|i1']; intros i2 st st' c Hle Hceval.
     simpl in Hceval. discriminate Hceval.
   - (* i1 = S i1' *)
     destruct i2 as [|i2']. inversion Hle.
-    assert (Hle': i1' <= i2') by omega.
+    assert (Hle': i1' <= i2') by lia.
     destruct c.
     + (* SKIP *)
       simpl in Hceval. inversion Hceval.
@@ -331,14 +348,88 @@ induction i1 as [|i1']; intros i2 st st' c Hle Hceval.
     请完成以下证明。你会在某些地方用到 [ceval_step_more] 以及一些关于
     [<=] 和 [plus] 的基本事实。 *)
 
+From LF Require Import IndProp.
+
 Theorem ceval__ceval_step: forall c st st',
       st =[ c ]=> st' ->
       exists i, ceval_step st c i = Some st'.
 Proof.
   intros c st st' Hce.
   induction Hce.
-  (* 请在此处解答 *) Admitted.
-(** [] *)
+  (* Case: E_Skip *)
+  - (* SKIP 只需要 1 步 *)
+    exists 1. simpl. reflexivity.
+    
+  (* Case: E_Ass *)
+  - (* 赋值同样只需要 1 步 *)
+    exists 1. simpl. subst. reflexivity.
+    
+  (* Case: E_Seq *)
+  - (* c1;; c2. 
+       归纳假设：c1 需要 i1，c2 需要 i2。
+       我们取 i = 1 + i1 + i2。 *)
+    destruct IHHce1 as [i1 H1].
+    destruct IHHce2 as [i2 H2].
+    exists (1 + i1 + i2).
+    simpl.
+    (* 第一步：证明 c1 在油量 (i1 + i2) 下能成功 *)
+    (* 利用单调性：i1 <= i1 + i2 *)
+    assert (H1_more: ceval_step st c1 (i1 + i2) = Some st').
+    { apply ceval_step_more with i1. 
+      - apply le_plus_l. (* i1 <= i1 + ... *)
+      - apply H1. }
+    rewrite H1_more.
+    (* 第二步：证明 c2 在油量 (i1 + i2) 下能成功 *)
+    (* 利用单调性：i2 <= i1 + i2 *)
+    apply ceval_step_more with i2.
+    + apply le_plus_r. (* i2 <= ... + i2 *)
+    + apply H2.
+
+  (* Case: E_IfTrue *)
+  - (* IF True. 归纳假设：c1 需要 i1。取 i = 1 + i1 *)
+    destruct IHHce as [i1 H1].
+    exists (1 + i1).
+    simpl.
+    rewrite H. (* 重写 beval st b = true *)
+    apply H1.
+
+  (* Case: E_IfFalse *)
+  - (* IF False. 归纳假设：c2 需要 i1。取 i = 1 + i1 *)
+    destruct IHHce as [i1 H1].
+    exists (1 + i1).
+    simpl.
+    rewrite H. (* 重写 beval st b = false *)
+    apply H1.
+
+  (* Case: E_WhileFalse *)
+  - (* While 循环结束（条件为假）。只需要 1 步来检查条件。 *)
+    exists 1.
+    simpl.
+    rewrite H. (* beval st b = false *)
+    reflexivity.
+
+  (* Case: E_WhileTrue *)
+  - (* While 循环体执行一次。
+       归纳假设：循环体 c1 需要 i1，后续的循环 WHILE 需要 i2。
+       取 i = 1 + i1 + i2。 *)
+    destruct IHHce1 as [i1 H1].
+    destruct IHHce2 as [i2 H2].
+    exists (1 + i1 + i2).
+    simpl.
+    rewrite H. (* beval st b = true *)
+    
+    (* 处理循环体 c1：需要证明给 i1+i2 油够用 *)
+    assert (H1_more: ceval_step st c (i1 + i2) = Some st').
+    { apply ceval_step_more with i1.
+      - apply le_plus_l.
+      - apply H1. }
+    rewrite H1_more.
+    
+    (* 处理剩余的循环 WHILE：需要证明给 i1+i2 油够用 *)
+    apply ceval_step_more with i2.
+    + apply le_plus_r.
+    + apply H2.
+Qed.
 
 Theorem ceval_and_ceval_step_coincide: forall c st st',
       st =[ c ]=> st'
